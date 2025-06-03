@@ -63,20 +63,13 @@ class MjLidarSensor:
                 self.geom_types[i] = geom.type
             self.geom_sizes[i] = ti.math.vec3(geom.size[0], geom.size[1], geom.size[2])
             self.geom_positions[i] = ti.math.vec3(geom.pos[0], geom.pos[1], geom.pos[2])
-            self.geom_data_ids[i] = geom.dataid
+            # TODO scene 里的 mesh dataid 是 mj_model 里的 meshid 的 2 倍
+            self.geom_data_ids[i] = geom.dataid // 2
             # 保存旋转矩阵
             rot_mat = geom.mat.reshape(3, 3)
             for r in range(3):
                 for c in range(3):
                     self.geom_rotations[i][r, c] = rot_mat[r, c]
-        # print(f"self.geom_data_ids = {self.geom_data_ids}")
-        # print(f"self.geom_types    = {self.geom_types}")
-        # mesh_id = self.geom_data_ids[0]
-        # print(f"mesh_id = {mesh_id}")
-        # face_addr = self.face_addr[mesh_id]
-        # print(f"face_addr = {face_addr}")
-
-        # exit(1)
 
         # 预先分配传感器位姿数组
         self.sensor_pose_ti = ti.ndarray(dtype=ti.f32, shape=(4, 4))

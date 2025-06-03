@@ -333,6 +333,12 @@ Options:
 
 Keyboard controls are the same as in ROS1.
 
+## 📝 TODO
+
+- [ ] **Mesh Auto-Simplification**: Automatic mesh simplification for better performance
+- [ ] **Mesh AABB Acceleration**: Axis-Aligned Bounding Box acceleration for mesh collision detection
+- [ ] **BVH Tree Acceleration**: Bounding Volume Hierarchy tree for faster ray-mesh intersection tests
+
 ## 📈 Performance Testing
 
 Run the performance test to benchmark the LiDAR simulation:

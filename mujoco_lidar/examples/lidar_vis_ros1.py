@@ -16,8 +16,10 @@ from sensor_msgs.msg import PointCloud2, PointField
 from visualization_msgs.msg import MarkerArray
 
 
-from mujoco_lidar.lidar_wrapper import MjLidarWrapper
-from mujoco_lidar.scan_gen import LivoxGenerator, generate_vlp32, generate_HDL64, generate_os128
+from mujoco_lidar import (
+    LidarSensor, LivoxGenerator, 
+    generate_vlp32, generate_HDL64, generate_os128
+)
 
 from mujoco_lidar.mj_lidar_utils import create_demo_scene, KeyboardListener, create_marker_from_geom
 
@@ -168,21 +170,31 @@ if __name__ == "__main__":
     tf_broadcaster = tf2_ros.TransformBroadcaster()
 
     # 创建MuJoCo场景
-    mj_model, mj_data = create_demo_scene()
+    mj_model, mj_data = create_demo_scene("mesh_scene")
+
+    # 创建场景对象
+    scene = mujoco.MjvScene(mj_model, maxgeom=10000)
 
     # 创建激光雷达传感器
-    wrapper_args = {
-        "enable_profiling": args.profiling,
-        "verbose": args.verbose
-    }
-    lidar_sim = MjLidarWrapper(mj_model, mj_data, site_name="lidar_site", args=wrapper_args)
+    lidar = LidarSensor(mj_model, site_name="lidar_site")
 
     # 设置激光雷达位置
     lidar_position = np.array([0.0, 0.0, 1.0], dtype=np.float32)
     lidar_orientation = np.array([0.0, 0.0, 0.0, 1.0], dtype=np.float32)  # 四元数(x,y,z,w)
 
+    # 获取激光雷达初始位置和方向
+    lidar_base_position = mj_model.body("lidar_base").pos
+    lidar_base_orientation = mj_model.body("lidar_base").quat[[1,2,3,0]]
+
     # 创建键盘监听器
-    kb_listener = KeyboardListener(lidar_position, lidar_orientation)
+    kb_listener = KeyboardListener(lidar_base_position, lidar_base_orientation)
+
+    def update_scene():
+        """更新MuJoCo场景"""
+        mujoco.mjv_updateScene(
+            mj_model, mj_data, mujoco.MjvOption(), 
+            None, mujoco.MjvCamera(), 
+            mujoco.mjtCatBit.mjCAT_ALL.value, scene)
 
     # 主循环
     rate = rospy.Rate(60)
@@ -210,8 +222,10 @@ if __name__ == "__main__":
                 rate.sleep()
 
                 if step_cnt % gap_step == 0:
+                    update_scene()
+                    
                     # 发布场景可视化标记
-                    publish_scene(pub_scene, lidar_sim.scene)
+                    publish_scene(pub_scene, scene)
                     # 执行光线追踪
                     start_time = time.time()
 
@@ -219,16 +233,16 @@ if __name__ == "__main__":
                     if use_livox_lidar:
                         rays_theta, rays_phi = livox_generator.sample_ray_angles()
 
-                    # 更新mujoco中激光雷达的场景
-                    lidar_sim.update_scene(mj_model, mj_data)
+                    # 更新激光雷达数据
+                    lidar.update(mj_data, rays_phi, rays_theta)
 
                     # 获取激光雷达点云
-                    points = lidar_sim.get_lidar_points(rays_phi, rays_theta, mj_data)
+                    points = lidar.get_data_in_local_frame()
                     end_time = time.time()
 
                     # 获取激光雷达位置和方向
-                    lidar_position = lidar_sim.sensor_position
-                    lidar_orientation = Rotation.from_matrix(lidar_sim.sensor_rotation).as_quat()
+                    lidar_position = lidar.sensor_position
+                    lidar_orientation = Rotation.from_matrix(lidar.sensor_rotation).as_quat()
                     
                     # 打印性能信息和当前位置
                     if args.verbose:
@@ -239,7 +253,7 @@ if __name__ == "__main__":
                             f"耗时: {(end_time - start_time)*1000:.2f} ms")
                         
                         if args.profiling:
-                            print(f"  准备时间: {lidar_sim.lidar_sensor.prepare_time:.2f}ms, 内核时间: {lidar_sim.lidar_sensor.kernel_time:.2f}ms")
+                            print(f"  射线追踪耗时: {(end_time - start_time)*1000:.2f} ms")
 
                     # 广播激光雷达的TF
                     broadcast_tf(tf_broadcaster, "world", "lidar", lidar_position, lidar_orientation)

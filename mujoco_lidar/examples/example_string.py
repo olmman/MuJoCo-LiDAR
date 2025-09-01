@@ -5,8 +5,7 @@ import mujoco
 import mujoco.viewer
 import matplotlib.pyplot as plt
 
-from mujoco_lidar.lidar_wrapper import MjLidarWrapper
-from mujoco_lidar.scan_gen import generate_grid_scan_pattern
+from mujoco_lidar import LidarSensor, generate_grid_scan_pattern
 
 simple_demo_scene = """
 <mujoco model="simple_demo">
@@ -47,15 +46,20 @@ simple_demo_scene = """
 # 创建MuJoCo模型
 mj_model = mujoco.MjModel.from_xml_string(simple_demo_scene)    
 mj_data = mujoco.MjData(mj_model)
+mujoco.mj_forward(mj_model, mj_data)
 
 # 生成网格扫描模式
-rays_theta, rays_phi = generate_grid_scan_pattern(num_ray_cols=64, num_ray_rows=16)
+ray_theta, ray_phi = generate_grid_scan_pattern(num_ray_cols=64, num_ray_rows=16)
+
+exclode_body_id = mj_model.body("your_robot_name").id
+print("exclude body id:", exclode_body_id)
 
 # 创建激光雷达传感器
-lidar_sim = MjLidarWrapper(mj_model, mj_data, site_name="lidar_site")
-points = lidar_sim.get_lidar_points(rays_phi, rays_theta, mj_data)
+lidar_sensor = LidarSensor(mj_model, site_name="lidar_site", bodyexclude=exclode_body_id)
+lidar_sensor.update(mj_data, ray_phi, ray_theta)
+points = lidar_sensor.get_data_in_local_frame()
 
-lidar_sim_rate = 10
+lidar_sim_rate = 15
 lidar_sim_cnt = 0
 
 # print help
@@ -93,10 +97,10 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
         if mj_data.time * lidar_sim_rate > lidar_sim_cnt:
 
             # 更新激光雷达位置
-            lidar_sim.update_scene(mj_model, mj_data)
+            lidar_sensor.update(mj_data, ray_phi, ray_theta)
 
             # 执行光线追踪
-            points = lidar_sim.get_lidar_points(rays_phi, rays_theta, mj_data)
+            points = lidar_sensor.get_data_in_local_frame()
             if lidar_sim_cnt == 0:
                 print("points basic info:")
                 print("  .shape:", points.shape)

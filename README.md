@@ -42,11 +42,11 @@ pip install -e .
 
 ### Basic Usage
 
-MJ-LiDAR provides two ways to use the library: directly through the core `MjLidarSensor` class or via the more user-friendly `MjLidarWrapper` class. The following examples showcase the wrapper class, which is more suitable for beginners.
+MuJoCo-LiDAR provides concise and efficient LiDAR simulation functionality. The main class used for LiDAR simulation is `LidarSensor`.
 
-#### Simple Example: Adding LiDAR to a MuJoCo Environment
+#### Simple Example: Defining Scene and LiDAR via Python String
 
-Here's a complete example `mujoco_lidar/examples/example_string.py` showing how to add a LiDAR to a MuJoCo environment and visualize the point cloud:
+Here's a complete example showing how to define a scene via Python string in a MuJoCo environment, add LiDAR and visualize the point cloud:
 
 ```python
 import time
@@ -55,8 +55,8 @@ import mujoco
 import mujoco.viewer
 import matplotlib.pyplot as plt
 
-# Import LiDAR wrapper and scan pattern generator
-from mujoco_lidar.lidar_wrapper import MjLidarWrapper
+# Import LiDAR class and scan pattern generator
+from mujoco_lidar import LidarSensor
 from mujoco_lidar.scan_gen import generate_grid_scan_pattern
 
 # 1. Define a simple MuJoCo scene (with various geometries and LiDAR site)
@@ -96,12 +96,13 @@ mj_data = mujoco.MjData(mj_model)
 # Here we create a simple grid scan pattern, 64 horizontal lines and 16 vertical lines
 rays_theta, rays_phi = generate_grid_scan_pattern(num_ray_cols=64, num_ray_rows=16)
 
-# 4. Create LiDAR sensor wrapper
+# 4. Create LiDAR sensor
 # Note: site_name parameter must match the <site name="lidar_site"> in the MJCF file
-lidar_sim = MjLidarWrapper(mj_model, mj_data, site_name="lidar_site")
+lidar = LidarSensor(mj_model, site_name="lidar_site")
 
 # 5. Perform ray casting to get point cloud data
-points = lidar_sim.get_lidar_points(rays_phi, rays_theta, mj_data)
+lidar.update(mj_data, rays_phi, rays_theta)
+points = lidar.get_data_in_local_frame()
 
 # 6. Set visualization update rate
 lidar_sim_rate = 10
@@ -141,11 +142,9 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
 
         # Update LiDAR point cloud at specified rate
         if mj_data.time * lidar_sim_rate > lidar_sim_cnt:
-            # Update LiDAR scene
-            lidar_sim.update_scene(mj_model, mj_data)
-
-            # Perform ray casting, get new point cloud
-            points = lidar_sim.get_lidar_points(rays_phi, rays_theta, mj_data)
+            # Update LiDAR data
+            lidar.update(mj_data, rays_phi, rays_theta)
+            points = lidar.get_data_in_local_frame()
             
             # Output point cloud basic information (only in first loop)
             if lidar_sim_cnt == 0:
@@ -174,7 +173,8 @@ python mujoco_lidar/examples/example_string.py
 
 #### Simple Example: Loading Scene and LiDAR via MJCF File
 
-This example (`mujoco_lidar/examples/example_mjcf.py`) demonstrates how to load a model from an MJCF file. First, you need to define the LiDAR-related `site` in your MJCF file (e.g., `models/demo.xml`):
+This example demonstrates how to load a model from an MJCF file. First, you need to define the LiDAR-related `site` in your MJCF file (e.g., `models/demo.xml`):
+
 ```xml
     <!-- LiDAR -->
     <body name="your_robot_name" pos="0 0 1" quat="1 0 0 0" mocap="true">
@@ -185,20 +185,20 @@ This example (`mujoco_lidar/examples/example_mjcf.py`) demonstrates how to load 
 ```
 
 Then in the Python script, the main difference is how the model is loaded:
+
 ```python
 # Load MuJoCo model from file
 mj_model = mujoco.MjModel.from_xml_path("../../models/demo.xml")    
 mj_data = mujoco.MjData(mj_model)
 ```
-The remaining steps (like generating scan patterns, creating the LiDAR instance, visualization, etc.) are similar to those in the preceding string-based example.
 
-To run the example:
+The remaining steps (like generating scan patterns, creating the LiDAR instance, visualization, etc.) are the same as the string-based method above.
+
+Run the program to see the effects:
+
 ```bash
 python mujoco_lidar/examples/example_mjcf.py
 ```
-
-如果您能手动完成这个添加，`README.md` 文件就能包含这部分新增的内容了。
-
 
 ### Using LiDAR in Your Own MuJoCo Environment
 
@@ -214,13 +214,11 @@ If you want to use the LiDAR in your own MuJoCo environment, follow these steps:
 
 2. **Choose an appropriate LiDAR scan pattern**:
    ```python
-   from mujoco_lidar.scan_gen import (
-       generate_HDL64,          # Velodyne HDL-64E pattern
-       generate_vlp32,          # Velodyne VLP-32C pattern
-       generate_os128,          # Ouster OS-128 pattern
-       LivoxGenerator,          # Livox series LiDARs
-       generate_grid_scan_pattern  # Custom grid scan pattern
+   from mujoco_lidar import (
+       LidarSensor, LivoxGenerator, 
+       generate_vlp32, generate_HDL64, generate_os128
    )
+   from mujoco_lidar.scan_gen import generate_grid_scan_pattern
    
    # Choose one of the following LiDAR scan patterns:
    
@@ -236,7 +234,7 @@ If you want to use the LiDAR in your own MuJoCo environment, follow these steps:
    # 4. Use Livox series non-repetitive scan pattern
    # Note: Other scanning methods use fixed ray angles that only need to be generated once, 
    # but Livox series uses non-repetitive scanning, so you need to call `livox_generator.sample_ray_angles()`
-   # before each `lidar_sim.get_lidar_points` call
+   # before each `lidar.update()` call
    livox_generator = LivoxGenerator("mid360")  # Options: "avia", "mid40", "mid70", "mid360", "tele"
    rays_theta, rays_phi = livox_generator.sample_ray_angles()
    
@@ -249,37 +247,29 @@ If you want to use the LiDAR in your own MuJoCo environment, follow these steps:
    )
    ```
 
-3. **Create LiDAR wrapper and get point cloud**:
+3. **Create LiDAR sensor and get point cloud**:
    ```python
    # Create mujoco model and data
    mj_model = mujoco.MjModel.from_xml_path('/path/to/mjcf.xml')
    mj_data = mujoco.MjData(mj_model)
    
-   # Initialize LiDAR wrapper
+   # Initialize LiDAR sensor
    # The site_name parameter must match the site name in your MJCF file
-   lidar_sim = MjLidarWrapper(
-       mj_model, 
-       mj_data, 
-       site_name="lidar_site",  # Match with <site name="..."> in MJCF
-       args={
-           "enable_profiling": False,  # Enable performance profiling (optional)
-           "verbose": False           # Show detailed information (optional)
-       }
-   )
+   lidar = LidarSensor(mj_model, site_name="lidar_site")
    
    # In simulation loop, get LiDAR point cloud
-    with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
-       while True:
+   with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
+       while viewer.is_running:
            # Update physics simulation
            mujoco.mj_step(mj_model, mj_data)
            
            # Usually mj_step frequency is much higher than lidar simulation frequency, 
            # it's better to reduce the LiDAR simulation frequency here
-           # Update LiDAR scene
-           lidar_sim.update_scene(mj_model, mj_data)
+           # Update LiDAR data
+           lidar.update(mj_data, rays_phi, rays_theta)
            
-           # Perform ray casting to get point cloud
-           points = lidar_sim.get_lidar_points(rays_phi, rays_theta, mj_data)
+           # Get point cloud data
+           points = lidar.get_data_in_local_frame()
            
            # Process point cloud data...
    ```
@@ -372,18 +362,28 @@ Keyboard controls are the same as in ROS1.
 Run the performance test to benchmark the LiDAR simulation:
 
 ```bash
-python mujoco_lidar/examples/test_speed.py --profiling --verbose
+python mujoco_lidar/examples/test_speed.py --verbose
 ```
 
 This will test 115,200 rays (equivalent to 1800×64 resolution) and show detailed timing information.
 
 Performance test script supports the following parameters:
-- `--profiling`: Enable performance profiling, showing detailed timing statistics
 - `--verbose`: Show more debug information
 - `--skip-test`: Skip performance test, only show demonstration
 - `--zh`: Use Chinese for charts
 - `--save-fig`: Save charts
 
+We tested the performance on three different computers, including a MacBook (yes :) our program is cross-platform like MuJoCo).
+
+In scenes with fewer geoms (<200), simulating with 115,200 rays can achieve 500Hz+ simulation efficiency, which is really fast!
+
+| Desktop PC<br />Intel Xeon w5-3435X<br />Nvidia 6000Ada    | MacBook M3Max 48GB<br /> | Lenovo Legion R9000P 2022<br />R7-5800H<br />Nvidia RTX 3060 |
+| :----------------------------------------------------------: | :----------------: | :---------------------------------------: |
+| ![pro_1](./assets/img_pro_1.png) | ![pro_2_zh](./assets/img_pro_2.jpg) | ![pro_1_zh](./assets/img_pro_3.jpg) |
+
+## 📄 License
+
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 We tested the performance on three different computers, including a MacBook (yes :) our program is cross-platform like MuJoCo).
 
 In scenes with fewer geoms (<200), simulating with 115,200 rays can achieve 500Hz+ simulation efficiency, which is really fast! Most of the time is spent in the preparation process, with a large proportion (>60%) spent copying data from CPU to GPU.

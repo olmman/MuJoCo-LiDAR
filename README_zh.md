@@ -42,11 +42,11 @@ pip install -e .
 
 ### 基本使用方法
 
-MJ-LiDAR提供了两种使用方式：直接使用核心的`MjLidarSensor`类或通过更友好的`MjLidarWrapper`包装类。以下示例将展示包装类的使用方法，它更适合初学者。
+MuJoCo-LiDAR 提供了简洁高效的 LiDAR 仿真功能。主要使用 `LidarSensor` 类来进行激光雷达仿真。
 
 #### 简单示例：通过字符串定义场景与激光雷达
 
-下面是一个完整的示例`mujoco_lidar/examples/example_string.py`，展示如何在MuJoCo环境中通过Python字符串定义场景，并添加激光雷达及可视化点云：
+下面是一个完整的示例，展示如何在MuJoCo环境中通过Python字符串定义场景，并添加激光雷达及可视化点云：
 
 ```python
 import time
@@ -55,8 +55,8 @@ import mujoco
 import mujoco.viewer
 import matplotlib.pyplot as plt
 
-# 导入激光雷达包装类和扫描模式生成函数
-from mujoco_lidar.lidar_wrapper import MjLidarWrapper
+# 导入激光雷达类和扫描模式生成函数
+from mujoco_lidar import LidarSensor
 from mujoco_lidar.scan_gen import generate_grid_scan_pattern
 
 # 1. 定义简单的MuJoCo场景（包含不同几何体和激光雷达站点）
@@ -96,12 +96,13 @@ mj_data = mujoco.MjData(mj_model)
 # 这里创建简单的网格扫描模式，水平64线，垂直16线
 rays_theta, rays_phi = generate_grid_scan_pattern(num_ray_cols=64, num_ray_rows=16)
 
-# 4. 创建激光雷达传感器包装类
+# 4. 创建激光雷达传感器
 # 注意：site_name参数必须与MJCF文件中的<site name="lidar_site">匹配
-lidar_sim = MjLidarWrapper(mj_model, mj_data, site_name="lidar_site")
+lidar = LidarSensor(mj_model, site_name="lidar_site")
 
 # 5. 执行光线追踪，获取点云数据
-points = lidar_sim.get_lidar_points(rays_phi, rays_theta, mj_data)
+lidar.update(mj_data, rays_phi, rays_theta)
+points = lidar.get_data_in_local_frame()
 
 # 6. 设置可视化更新频率
 lidar_sim_rate = 10
@@ -141,11 +142,9 @@ with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
 
         # 按照指定频率更新激光雷达点云
         if mj_data.time * lidar_sim_rate > lidar_sim_cnt:
-            # 更新激光雷达场景
-            lidar_sim.update_scene(mj_model, mj_data)
-
-            # 执行光线追踪，获取新的点云
-            points = lidar_sim.get_lidar_points(rays_phi, rays_theta, mj_data)
+            # 更新激光雷达数据
+            lidar.update(mj_data, rays_phi, rays_theta)
+            points = lidar.get_data_in_local_frame()
             
             # 输出点云基本信息（仅在第一次循环）
             if lidar_sim_cnt == 0:
@@ -174,7 +173,7 @@ python mujoco_lidar/examples/example_string.py
 
 #### 简单示例：通过MJCF文件加载场景与激光雷达
 
-此示例 (`mujoco_lidar/examples/example_mjcf.py`) 演示了如何从MJCF文件加载模型。首先，需要在你的MJCF文件（例如 `models/demo.xml`）中定义激光雷达相关的 `site`，如：
+此示例演示了如何从MJCF文件加载模型。首先，需要在你的MJCF文件（例如 `models/demo.xml`）中定义激光雷达相关的 `site`，如：
 
 ```xml
     <!-- 激光雷达 -->
@@ -193,7 +192,7 @@ mj_model = mujoco.MjModel.from_xml_path("../../models/demo.xml")
 mj_data = mujoco.MjData(mj_model)
 ```
 
-其余步骤（如生成扫描模式、创建激光雷达实例、可视化等）和`example_string.py`中的方法一致。
+其余步骤（如生成扫描模式、创建激光雷达实例、可视化等）和上面的方法一致。
 
 运行程序，查看效果：
 
@@ -215,13 +214,11 @@ python mujoco_lidar/examples/example_mjcf.py
 
 2. **选择合适的激光雷达扫描模式**：
    ```python
-   from mujoco_lidar.scan_gen import (
-       generate_HDL64,          # Velodyne HDL-64E 模式
-       generate_vlp32,          # Velodyne VLP-32C 模式
-       generate_os128,          # Ouster OS-128 模式
-       LivoxGenerator,          # Livox系列雷达
-       generate_grid_scan_pattern  # 自定义网格扫描模式
+   from mujoco_lidar import (
+       LidarSensor, LivoxGenerator, 
+       generate_vlp32, generate_HDL64, generate_os128
    )
+   from mujoco_lidar.scan_gen import generate_grid_scan_pattern
    
    # 选择一种雷达扫描模式:
    
@@ -235,8 +232,8 @@ python mujoco_lidar/examples/example_mjcf.py
    rays_theta, rays_phi = generate_os128()
    
    # 4. 使用Livox系列非重复扫描模式
-   # 注意 其他扫描方式是固定的射线角度，只需生成一次即可，但是livox系列是非重复式扫描，
-   # 每次执行 `lidar_sim.get_lidar_points` 之前都需要执行一次 `livox_generator.sample_ray_angles()`
+   # 注意：其他扫描方式是固定的射线角度，只需生成一次即可，但是livox系列是非重复式扫描，
+   # 每次执行 `lidar.update()` 之前都需要执行一次 `livox_generator.sample_ray_angles()`
    livox_generator = LivoxGenerator("mid360")  # 可选: "avia", "mid40", "mid70", "mid360", "tele"
    rays_theta, rays_phi = livox_generator.sample_ray_angles()
    
@@ -249,36 +246,28 @@ python mujoco_lidar/examples/example_mjcf.py
    )
    ```
 
-3. **创建激光雷达包装类并获取点云**：
+3. **创建激光雷达传感器并获取点云**：
    ```python
    # 创建mujoco model 和 data
    mj_model = mujoco.MjModel.from_xml_path('/path/to/mjcf.xml')
    mj_data = mujoco.MjData(mj_model)
    
-   # 初始化激光雷达包装类
+   # 初始化激光雷达传感器
    # site_name参数必须与MJCF文件中的site名称匹配
-   lidar_sim = MjLidarWrapper(
-       mj_model, 
-       mj_data, 
-       site_name="lidar_site",  # 与MJCF中的<site name="...">匹配
-       args={
-           "enable_profiling": False, # 启用性能分析（可选）
-           "verbose": False           # 显示详细信息（可选）
-       }
-   )
+   lidar = LidarSensor(mj_model, site_name="lidar_site")
    
    # 在模拟循环中获取激光雷达点云
-    with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
-       while True:
+   with mujoco.viewer.launch_passive(mj_model, mj_data) as viewer:
+       while viewer.is_running:
            # 更新物理模拟
            mujoco.mj_step(mj_model, mj_data)
            
            # 通常mj_step的频率远高于lidar模拟的频率，此处最好进行分频操作，降低lidar模拟频率
-           # 更新激光雷达场景
-           lidar_sim.update_scene(mj_model, mj_data)
+           # 更新激光雷达数据
+           lidar.update(mj_data, rays_phi, rays_theta)
            
-           # 执行光线追踪，获取点云数据
-           points = lidar_sim.get_lidar_points(rays_phi, rays_theta, mj_data)
+           # 获取点云数据
+           points = lidar.get_data_in_local_frame()
            
            # 处理点云数据...
    ```
@@ -371,13 +360,12 @@ python mujoco_lidar/examples/lidar_vis_ros2.py [options]
 运行性能测试以评估激光雷达仿真性能：
 
 ```bash
-python mujoco_lidar/examples/test_speed.py --profiling --verbose
+python mujoco_lidar/examples/test_speed.py --verbose
 ```
 
 这将测试115,200射线（相当于1800×64分辨率）的性能，并显示详细的计时信息。
 
 性能测试程序支持的参数：
-- `--profiling`: 启用性能分析，显示详细的时间统计
 - `--verbose`: 显示更多调试信息
 - `--skip-test`: 跳过性能测试，只显示演示
 - `--zh`: 图表使用中文
@@ -385,7 +373,7 @@ python mujoco_lidar/examples/test_speed.py --profiling --verbose
 
 在三款不同配置电脑上测试了性能，其中甚至包含一台MacBook（是的 :) 我们的程序和MuJoCo一样，是跨平台的）
 
-在较少geom数量（<200）的场景中，使用115,200条射线进行模拟，可以达到500Hz+的仿真效率，这真的是太快了！其中大部分的时间都花在了准备过程中，将数据从cpu拷贝到gpu的时间占了很大的比例（>60%）。
+在较少geom数量（<200）的场景中，使用115,200条射线进行模拟，可以达到500Hz+的仿真效率，这真的是太快了！
 
 | 台式机<br />Intel Xeon w5-3435X<br />Nvidia 6000Ada    | MacBook M3Max 48GB<br /> | 拯救者 R9000P2022 <br />R7-5800H<br />Nvidia RTX 3060 |
 | :----------------------------------------------------------: | :----------------: | :---------------------------------------: |

@@ -7,7 +7,6 @@ import traceback
 import mujoco
 import mujoco.viewer
 import numpy as np
-import taichi as ti
 from scipy.spatial.transform import Rotation
 
 import rclpy
@@ -17,12 +16,12 @@ from geometry_msgs.msg import TransformStamped
 from sensor_msgs.msg import PointCloud2, PointField
 from visualization_msgs.msg import MarkerArray
 
-
-from mujoco_lidar.lidar_wrapper import MjLidarWrapper
-from mujoco_lidar.scan_gen import LivoxGenerator, generate_vlp32, generate_HDL64, generate_os128
+from mujoco_lidar import (
+    LidarSensor, LivoxGenerator, 
+    generate_vlp32, generate_HDL64, generate_os128
+)
 
 from mujoco_lidar.mj_lidar_utils import create_demo_scene, KeyboardListener, create_marker_from_geom
-
 
 def publish_scene(publisher, mj_scene, frame_id, stamp):
     """将MuJoCo场景发布为ROS可视化标记数组"""
@@ -132,7 +131,9 @@ class LidarVisualizer(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
 
         # 创建MuJoCo场景
-        self.mj_model, self.mj_data = create_demo_scene()
+        self.mj_model, self.mj_data = create_demo_scene("mesh_scene")
+
+        self.scene = mujoco.MjvScene(self.mj_model, maxgeom=10000)
 
         self.use_livox_lidar = False
         if args.lidar in {"avia", "mid40", "mid70", "mid360", "tele"}:
@@ -153,7 +154,7 @@ class LidarVisualizer(Node):
         self.rays_phi = np.ascontiguousarray(self.rays_phi)
 
         # 创建激光雷达传感器
-        self.lidar = MjLidarWrapper(self.mj_model, self.mj_data, site_name="lidar_site", args={"enable_profiling": args.profiling, "verbose": args.verbose})
+        self.lidar = LidarSensor(self.mj_model, site_name="lidar_site")
 
         self.get_logger().info(f"射线数量: {len(self.rays_phi)}")
 
@@ -164,12 +165,17 @@ class LidarVisualizer(Node):
         # 创建键盘监听器
         self.kb_listener = KeyboardListener(lidar_base_position, lidar_base_orientation)
 
+    def update_scene(self):
+        mujoco.mjv_updateScene(
+            self.mj_model, self.mj_data, mujoco.MjvOption(), 
+            None, mujoco.MjvCamera(), 
+            mujoco.mjtCatBit.mjCAT_ALL.value, self.scene)
+
 def main():
     # 解析命令行参数
     parser = argparse.ArgumentParser(description='MuJoCo LiDAR可视化与ROS2集成')
     parser.add_argument('--lidar', type=str, default='mid360', help='LiDAR型号 (mid360, HDL64, vlp32, os128)', \
                         choices=['avia', 'HAP', 'horizon', 'mid40', 'mid70', 'mid360', 'tele', 'HDL64', 'vlp32', 'os128'])
-    parser.add_argument('--profiling', action='store_true', help='启用性能分析')
     parser.add_argument('--verbose', action='store_true', help='显示详细输出信息')
     parser.add_argument('--rate', type=int, default=12, help='循环频率 (Hz) (默认: 12)')
     args = parser.parse_args()
@@ -180,7 +186,6 @@ def main():
     print(f"配置：")
     print(f"- LiDAR型号: {args.lidar}")
     print(f"- 循环频率: {args.rate} Hz")
-    print(f"- 性能分析: {'启用' if args.profiling else '禁用'}")
     print(f"- 详细输出: {'启用' if args.verbose else '禁用'}")
 
     forder_path = os.path.dirname(os.path.abspath(__file__))
@@ -222,17 +227,19 @@ def main():
                 rate.sleep()
 
                 if step_cnt % step_gap == 0:
-                    # 发布场景可视化标记
-                    publish_scene(node.pub_scene, node.lidar.scene, "world", node.get_clock().now().to_msg())
+                    node.update_scene()
 
-                    # 执行光线追踪
+                    # 发布场景可视化标记
+                    publish_scene(node.pub_scene, node.scene, "world", node.get_clock().now().to_msg())
+
+                    # 执行ray casting
                     start_time = time.time()
 
                     if node.use_livox_lidar:
                         node.rays_theta, node.rays_phi = node.livox_generator.sample_ray_angles()
 
-                    points = node.lidar.get_lidar_points(node.rays_phi, node.rays_theta, node.mj_data)
-                    ti.sync()
+                    node.lidar.update(node.mj_data, node.rays_phi, node.rays_theta)
+                    points = node.lidar.get_data_in_local_frame()
                     end_time = time.time()
 
                     # 获取激光雷达位置和方向
@@ -242,20 +249,16 @@ def main():
                     # 打印性能信息和当前位置
                     if args.verbose:
                         # 格式化欧拉角为度数
-                        euler_deg = np.degrees(Rotation.from_quat(lidar_orientation).as_euler('xyz', degrees=True))
+                        euler_deg = Rotation.from_quat(lidar_orientation).as_euler('xyz', degrees=True)
                         node.get_logger().info(f"位置: [{lidar_position[0]:.2f}, {lidar_position[1]:.2f}, {lidar_position[2]:.2f}], "
                             f"欧拉角: [{euler_deg[0]:.1f}°, {euler_deg[1]:.1f}°, {euler_deg[2]:.1f}°], "
                             f"耗时: {(end_time - start_time)*1000:.2f} ms")
-
-                        if args.profiling:
-                            node.get_logger().info(f"  准备时间: {node.lidar.lidar_sensor.prepare_time:.2f}ms, 内核时间: {node.lidar.lidar_sensor.kernel_time:.2f}ms")
 
                     # 广播激光雷达的TF
                     broadcast_tf(node.tf_broadcaster, "world", "lidar", lidar_position, lidar_orientation, node.get_clock().now().to_msg())
 
                     # 发布点云
-                    publish_point_cloud(node.pub_taichi, points, "lidar", node.get_clock().now().to_msg()
-)
+                    publish_point_cloud(node.pub_taichi, points, "lidar", node.get_clock().now().to_msg())
 
     except KeyboardInterrupt:
         print("用户中断，正在退出...")
@@ -263,6 +266,9 @@ def main():
         print(f"发生错误: {e}")
         traceback.print_exc()
     finally:
+        if hasattr(node, 'kb_listener'):
+            del node.kb_listener
+            print("键盘监听器已清理")
         # 清理资源
         spin_thread.join()
         node.destroy_node()

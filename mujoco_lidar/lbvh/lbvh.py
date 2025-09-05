@@ -13,7 +13,7 @@ import torch
 import numpy as np
 
 import taichi as ti
-from .aabb import AABB
+from mujoco_lidar.lbvh.aabb import AABB
 
 ti_bool = ti.u1
 

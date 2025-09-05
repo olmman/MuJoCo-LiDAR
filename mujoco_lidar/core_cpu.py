@@ -1,3 +1,5 @@
+from typing import Union
+
 import mujoco
 import numpy as np
 
@@ -5,8 +7,6 @@ try:
     import taichi as ti
 except ImportError:
     ti = None
-
-from typing import Union
 
 class LidarSensor:
     def __init__(self, 
@@ -28,7 +28,7 @@ class LidarSensor:
         assert backend in ["cpu", "gpu"], "backend must be 'cpu' or 'gpu'"
         self.backend = backend
         if self.backend == "gpu":
-            from lidar_scanner import StaticBVHLidar
+            from .lidar_scanner import StaticBVHLidar
             self.ti_lidar = StaticBVHLidar(obj_path=obj_path)
 
     def update_sensor_pose(self, mj_data:mujoco.MjData) -> None:
@@ -58,7 +58,6 @@ class LidarSensor:
 
         if self.backend == "gpu":
             self.ti_lidar.trace_ti(self._sensorpose, ray_theta, ray_phi)
-            self.pcl_world = self.ti_lidar.get_hit_points()
 
         elif self.backend == "cpu":
             if ray_phi.shape[0] != ray_theta.shape[0]:
@@ -103,14 +102,22 @@ class LidarSensor:
             self.pcl_frame = local_vecs * _dist[:, np.newaxis]
 
     def get_data_in_local_frame(self) -> np.ndarray:
-        if not hasattr(self, 'pcl_frame'):
-            raise ValueError("No point cloud data available. Please call update() first.")
-        return self.pcl_frame
+        if self.backend == "cpu":
+            if not hasattr(self, 'pcl_frame'):
+                raise ValueError("No point cloud data available. Please call update() first.")
+            return self.pcl_frame
+        elif self.backend == "gpu":
+            Tmat_inv = np.linalg.inv(self._sensorpose)
+            pcl_world = self.ti_lidar.get_hit_points()
+            if pcl_world is None:
+                raise ValueError("No point cloud data available. Please call update() first.")
+            pcl_local = pcl_world @ Tmat_inv[:3,:3].T + Tmat_inv[:3,3]
+            return pcl_local
 
     def get_data_in_world_frame(self) -> np.ndarray:
         if self.backend == "cpu":
             pcl_local = self.get_data_in_local_frame()
-            site_pos, site_mat = self.sensor_pose()
+            site_pos, site_mat = self.sensor_pose
             pcl_world = pcl_local @ site_mat.T + site_pos
             return pcl_world
         elif self.backend == "gpu":

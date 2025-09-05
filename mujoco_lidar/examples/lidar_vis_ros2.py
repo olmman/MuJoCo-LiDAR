@@ -131,7 +131,7 @@ class LidarVisualizer(Node):
         self.tf_broadcaster = TransformBroadcaster(self)
 
         # 创建MuJoCo场景
-        self.mj_model, self.mj_data = create_demo_scene("mesh_scene")
+        self.mj_model, self.mj_data = create_demo_scene("floor")
 
         self.scene = mujoco.MjvScene(self.mj_model, maxgeom=10000)
 
@@ -150,13 +150,28 @@ class LidarVisualizer(Node):
             raise ValueError(f"不支持的LiDAR型号: {args.lidar}")
 
         # 优化内存布局
-        self.rays_theta = np.ascontiguousarray(self.rays_theta)
-        self.rays_phi = np.ascontiguousarray(self.rays_phi)
+        self.rays_theta = np.ascontiguousarray(self.rays_theta).astype(np.float32)
+        self.rays_phi = np.ascontiguousarray(self.rays_phi).astype(np.float32)
 
         # 创建激光雷达传感器
-        self.lidar = LidarSensor(self.mj_model, site_name="lidar_site")
+        if args.obj_path and os.path.exists(args.obj_path):
+            obj_path = args.obj_path
+        else:
+            obj_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "../../models", "scene.obj")
 
-        self.get_logger().info(f"射线数量: {len(self.rays_phi)}")
+        self.lidar = LidarSensor(self.mj_model, site_name="lidar_site", backend="gpu", obj_path=obj_path)
+
+        n_rays = len(self.rays_theta)
+        if self.lidar.backend == "gpu":
+            import taichi as ti
+            _rays_phi = ti.ndarray(dtype=ti.f32, shape=n_rays)
+            _rays_theta = ti.ndarray(dtype=ti.f32, shape=n_rays)
+            _rays_phi.from_numpy(self.rays_phi)
+            _rays_theta.from_numpy(self.rays_theta)
+            self.rays_phi = _rays_phi
+            self.rays_theta = _rays_theta
+
+        self.get_logger().info(f"射线数量: {n_rays}")
 
         # 获取激光雷达初始位置和方向
         lidar_base_position = self.mj_model.body("lidar_base").pos
@@ -178,6 +193,7 @@ def main():
                         choices=['avia', 'HAP', 'horizon', 'mid40', 'mid70', 'mid360', 'tele', 'HDL64', 'vlp32', 'os128'])
     parser.add_argument('--verbose', action='store_true', help='显示详细输出信息')
     parser.add_argument('--rate', type=int, default=12, help='循环频率 (Hz) (默认: 12)')
+    parser.add_argument('--obj-path', type=str, help='OBJ文件路径')
     args = parser.parse_args()
 
     print("\n" + "=" * 60)
@@ -187,6 +203,8 @@ def main():
     print(f"- LiDAR型号: {args.lidar}")
     print(f"- 循环频率: {args.rate} Hz")
     print(f"- 详细输出: {'启用' if args.verbose else '禁用'}")
+    if args.obj_path:
+        print(f"- OBJ文件: {args.obj_path}")
 
     forder_path = os.path.dirname(os.path.abspath(__file__))
     cmd = f"ros2 run rviz2 rviz2 -d {forder_path}/config/rviz2_config.rviz"
@@ -232,27 +250,22 @@ def main():
                     # 发布场景可视化标记
                     publish_scene(node.pub_scene, node.scene, "world", node.get_clock().now().to_msg())
 
-                    # 执行ray casting
                     start_time = time.time()
-
                     if node.use_livox_lidar:
-                        node.rays_theta, node.rays_phi = node.livox_generator.sample_ray_angles()
+                        if node.lidar.backend == "cpu":
+                            node.rays_theta, node.rays_phi = node.livox_generator.sample_ray_angles()
+                        elif node.lidar.backend == "gpu":
+                            node.rays_theta, node.rays_phi = node.livox_generator.sample_ray_angles_ti()
 
+                    # 执行ray casting
                     node.lidar.update(node.mj_data, node.rays_phi, node.rays_theta)
+
                     points = node.lidar.get_data_in_local_frame()
-                    end_time = time.time()
 
                     # 获取激光雷达位置和方向
                     lidar_position = node.lidar.sensor_position
                     lidar_orientation = Rotation.from_matrix(node.lidar.sensor_rotation).as_quat()
 
-                    # 打印性能信息和当前位置
-                    if args.verbose:
-                        # 格式化欧拉角为度数
-                        euler_deg = Rotation.from_quat(lidar_orientation).as_euler('xyz', degrees=True)
-                        node.get_logger().info(f"位置: [{lidar_position[0]:.2f}, {lidar_position[1]:.2f}, {lidar_position[2]:.2f}], "
-                            f"欧拉角: [{euler_deg[0]:.1f}°, {euler_deg[1]:.1f}°, {euler_deg[2]:.1f}°], "
-                            f"耗时: {(end_time - start_time)*1000:.2f} ms")
 
                     # 广播激光雷达的TF
                     broadcast_tf(node.tf_broadcaster, "world", "lidar", lidar_position, lidar_orientation, node.get_clock().now().to_msg())
@@ -260,12 +273,24 @@ def main():
                     # 发布点云
                     publish_point_cloud(node.pub_taichi, points, "lidar", node.get_clock().now().to_msg())
 
+                    end_time = time.time()
+
+                    # 打印性能信息和当前位置
+                    if args.verbose:
+                        # 格式化欧拉角为度数
+                        euler_deg = Rotation.from_quat(lidar_orientation).as_euler('xyz', degrees=True)
+                        node.get_logger().info(f"位置: [{lidar_position[0]:.2f}, {lidar_position[1]:.2f}, {lidar_position[2]:.2f}], "
+                            f"范围: x=({points[:,0].min():.2f} {points[:,0].max():.2f}), y=({points[:,1].min():.2f} {points[:,1].max():.2f}), z=({points[:,2].min():.2f} {points[:,2].max():.2f}) "+
+                            f"欧拉角: [{euler_deg[0]:.1f}°, {euler_deg[1]:.1f}°, {euler_deg[2]:.1f}°], "
+                            f"耗时: {(end_time - start_time)*1000:.2f} ms")
+
     except KeyboardInterrupt:
         print("用户中断，正在退出...")
     except Exception as e:
         print(f"发生错误: {e}")
         traceback.print_exc()
     finally:
+        os.system("stty echo")  # 恢复终端回显
         if hasattr(node, 'kb_listener'):
             del node.kb_listener
             print("键盘监听器已清理")

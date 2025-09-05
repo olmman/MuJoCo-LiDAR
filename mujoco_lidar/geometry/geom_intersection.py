@@ -13,7 +13,7 @@
 """
 
 import taichi as ti
-from .utils import _transform_ray_to_local, _transform_point_to_world
+from mujoco_lidar.geometry.utils import _transform_ray_to_local, _transform_point_to_world
 
 @ti.func
 def ray_geom_intersection(geom_type, ray_start, ray_direction, center, size, rotation):

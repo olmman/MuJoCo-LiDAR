@@ -1,14 +1,10 @@
 import os
-import sys
 import numpy as np
 import taichi as ti
 
-project_root = os.path.dirname(os.path.abspath(__file__))
-sys.path.append(project_root)
-
-from lbvh.aabb import AABB
-from lbvh.lbvh import LBVH
-from geometry.mesh_intersection import ray_triangle_distance
+from mujoco_lidar.lbvh.aabb import AABB
+from mujoco_lidar.lbvh.lbvh import LBVH
+from mujoco_lidar.geometry.mesh_intersection import ray_triangle_distance
 
 @ti.data_oriented
 class StaticBVHLidar:

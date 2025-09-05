@@ -8,7 +8,7 @@ import taichi as ti
 project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
 
-from lidar_scanner import StaticBVHLidar
+from mujoco_lidar.lidar_scanner import StaticBVHLidar
 from scan_gen import generate_os128, create_lidar_single_line, generate_grid_scan_pattern
 
 # 初始化 Taichi

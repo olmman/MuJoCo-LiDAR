@@ -2,9 +2,8 @@ import os
 import numpy as np
 import taichi as ti
 
-from mujoco_lidar.lbvh.aabb import AABB
-from mujoco_lidar.lbvh.lbvh import LBVH
-from mujoco_lidar.geometry.mesh_intersection import ray_triangle_distance
+from tibvh import AABB, LBVH
+from tibvh.geometry import ray_triangle_distance
 
 @ti.data_oriented
 class StaticBVHLidar:

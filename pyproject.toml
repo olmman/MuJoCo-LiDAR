@@ -25,6 +25,7 @@ dependencies = [
     "pynput",
     "matplotlib",
     "zhplot",
+    "tibvh @ git+https://github.com/TATP-233/tibvh.git",
 ]
 
 [project.urls]

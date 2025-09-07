@@ -11,7 +11,7 @@ from mujoco_lidar import LidarSensor, generate_grid_scan_pattern
 os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 # 从文件加载MuJoCo模型
-mj_model = mujoco.MjModel.from_xml_path("../../models/demo.xml")    
+mj_model = mujoco.MjModel.from_xml_path("../models/demo.xml")    
 mj_data = mujoco.MjData(mj_model)
 mujoco.mj_forward(mj_model, mj_data)
 

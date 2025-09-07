@@ -8,8 +8,11 @@ A high-performance LiDAR simulation tool designed for MuJoCo, powered by Taichi 
 
 ## 🌟 Features
 
-- **GPU-Accelerated**: Uses Taichi for efficient parallel computing on GPUs
-- **High Performance**: Can generate 1,000,000+ rays in milliseconds
+- **GPU-Accelerated**: Uses Taichi for efficient parallel computing on ```bash
+python examples/lidar_vis_ros1.py [options]
+
+Options:
+  --lidar MODEL      Specify LiDAR model, options:- **High Performance**: Can generate 1,000,000+ rays in milliseconds
 - **Multiple LiDAR Models**: Supports various LiDAR scan patterns:
   - Livox non-repetitive scanning: mid360, mid70, mid40, tele, avia
   - Velodyne HDL-64E, VLP-32C
@@ -26,6 +29,7 @@ A high-performance LiDAR simulation tool designed for MuJoCo, powered by Taichi 
 - MuJoCo >= 3.2.0
 - Taichi >= 1.6.0
 - NumPy >= 1.20.0
+- TIBVH (Taichi-based Linear BVH) - For high-performance spatial data structures and geometry processing
 
 ### Quick Install
 
@@ -34,8 +38,18 @@ A high-performance LiDAR simulation tool designed for MuJoCo, powered by Taichi 
 git clone https://github.com/TATP-233/MuJoCo-LiDAR.git
 cd MuJoCo-LiDAR
 
-# Install with pip
+# Install with pip (will automatically install all dependencies including tibvh)
 pip install -e .
+```
+
+**Note**: If automatic dependency installation fails, you may need to manually install TIBVH:
+
+```bash
+# Manually install TIBVH dependency
+git clone https://github.com/TATP-233/tibvh.git
+cd tibvh
+pip install -e .
+cd ..
 ```
 
 ## 📚 Usage Examples
@@ -164,7 +178,7 @@ plot_points_thread.join()
 Run the program to see the effects:
 
 ```bash
-python mujoco_lidar/examples/example_string.py
+python examples/example_string.py
 
 # In mujoco.viewer, double-click to select the red box where lidar_site is located. Hold Ctrl and right-click drag to move the red box,
 # Hold Ctrl and left-click drag to rotate the red box, while observing the position changes of the lidar points in the `Figure 1` window of matplotlib
@@ -197,7 +211,7 @@ The remaining steps (like generating scan patterns, creating the LiDAR instance,
 Run the program to see the effects:
 
 ```bash
-python mujoco_lidar/examples/example_mjcf.py
+python examples/example_mjcf.py
 ```
 
 ### Using LiDAR in Your Own MuJoCo Environment
@@ -283,10 +297,10 @@ If you want to use the LiDAR in your own MuJoCo environment, follow these steps:
 roscore
 
 # Second terminal
-python mujoco_lidar/examples/lidar_vis_ros1.py
+python examples/lidar_vis_ros1.py
 
 # Third terminal - Use RViz to visualize scene and point cloud
-rosrun rviz rviz -d mujoco_lidar/examples/config/rviz_config.rviz
+rosrun rviz rviz -d examples/config/rviz_config.rviz
 ```
 
 This publishes LiDAR scans as PointCloud2 messages on the `/lidar_points` topic.
@@ -311,7 +325,7 @@ Options:
 
 Example: Using HDL64 LiDAR with profiling enabled and publishing rate of 10Hz
 ```bash
-python mujoco_lidar/examples/lidar_vis_ros1.py --lidar HDL64 --profiling --rate 10
+python examples/lidar_vis_ros1.py --lidar HDL64 --profiling --rate 10
 ```
 
 #### Keyboard Interaction
@@ -327,10 +341,10 @@ In the ROS examples, you can use the keyboard to control the LiDAR position and 
 
 ```bash
 # First terminal
-python mujoco_lidar/examples/lidar_vis_ros2.py
+python examples/lidar_vis_ros2.py
 
 # Second terminal - Use RViz2 to visualize scene and point cloud
-ros2 run rviz2 rviz2 -d mujoco_lidar/examples/config/rviz_config.rviz
+ros2 run rviz2 rviz2 -d examples/config/rviz_config.rviz
 ```
 
 This publishes LiDAR scans as PointCloud2 messages on the `/lidar_points` topic.
@@ -340,7 +354,7 @@ This publishes LiDAR scans as PointCloud2 messages on the `/lidar_points` topic.
 `lidar_vis_ros2.py` supports the same command line arguments as the ROS1 example:
 
 ```bash
-python mujoco_lidar/examples/lidar_vis_ros2.py [options]
+python examples/lidar_vis_ros2.py [options]
 
 Options:
   --lidar MODEL      Specify LiDAR model, same options as ROS1 example
@@ -362,7 +376,7 @@ Keyboard controls are the same as in ROS1.
 Run the performance test to benchmark the LiDAR simulation:
 
 ```bash
-python mujoco_lidar/examples/test_speed.py --verbose
+python examples/test_speed.py --verbose
 ```
 
 This will test 115,200 rays (equivalent to 1800×64 resolution) and show detailed timing information.

@@ -9,7 +9,7 @@ project_root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.append(project_root)
 
 from mujoco_lidar.lidar_scanner import StaticBVHLidar
-from scan_gen import generate_os128, create_lidar_single_line, generate_grid_scan_pattern
+from mujoco_lidar.scan_gen import generate_os128, create_lidar_single_line, generate_grid_scan_pattern
 
 # 初始化 Taichi
 ti.init(arch=ti.gpu)
@@ -21,7 +21,7 @@ def pick_obj():
     # desktop_obj = os.path.expanduser('~/Desktop/N6.obj')
     # if os.path.isfile(desktop_obj):
     #     return desktop_obj
-    builtin = os.path.join(project_root, '../models', 'scene.obj')
+    builtin = os.path.join(project_root, './models', 'scene.obj')
     return builtin
 
 def prepare_angles(mode='os128'):
@@ -95,7 +95,7 @@ if __name__ == '__main__':
     print(f'命中: {hit_count}/{n_rays}  命中率: {hit_count/n_rays*100:.2f}%')
     print(f'候选溢出次数: {stats["overflow_count"]}')
 
-    # 8. 保存结果
-    np.save('mesh_test_hit_points.npy', hit_pts)
-    np.save('mesh_test_distances.npy', dists)
-    print('结果已保存: mesh_test_hit_points.npy / mesh_test_distances.npy')
+    # # 8. 保存结果
+    # np.save('mesh_test_hit_points.npy', hit_pts)
+    # np.save('mesh_test_distances.npy', dists)
+    # print('结果已保存: mesh_test_hit_points.npy / mesh_test_distances.npy')

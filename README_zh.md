@@ -26,6 +26,7 @@
 - MuJoCo >= 3.2.0
 - Taichi >= 1.6.0
 - NumPy >= 1.20.0
+- TIBVH (Taichi-based Linear BVH) - 用于高性能空间数据结构和几何处理
 
 ### 快速安装
 
@@ -34,8 +35,18 @@
 git clone https://github.com/TATP-233/MuJoCo-LiDAR.git
 cd MuJoCo-LiDAR
 
-# 使用pip安装
+# 使用pip安装（会自动安装所有依赖项，包括tibvh）
 pip install -e .
+```
+
+**注意**：如果自动安装依赖项失败，您可能需要手动安装 TIBVH：
+
+```bash
+# 手动安装 TIBVH 依赖项
+git clone https://github.com/TATP-233/tibvh.git
+cd tibvh
+pip install -e .
+cd ..
 ```
 
 ## 📚 使用示例
@@ -164,7 +175,7 @@ plot_points_thread.join()
 运行程序，查看效果：
 
 ```bash
-python mujoco_lidar/examples/example_string.py
+python examples/example_string.py
 
 # 在mujoco.viewer中，双击选中lidar_site所在的红色方块，按住Ctrl键，右键鼠标拖动可以平移红色方块，
 # 按住Ctrl，左键鼠标拖动可以旋转红色方块，同时观察matplotlib的`Figure 1`界面中的lidar点云的位置变化
@@ -197,7 +208,7 @@ mj_data = mujoco.MjData(mj_model)
 运行程序，查看效果：
 
 ```bash
-python mujoco_lidar/examples/example_mjcf.py
+python examples/example_mjcf.py
 ```
 
 ### 在自己的MuJoCo环境中使用激光雷达
@@ -281,10 +292,10 @@ python mujoco_lidar/examples/example_mjcf.py
 roscore
 
 # 第二个终端
-python mujoco_lidar/examples/lidar_vis_ros1.py
+python examples/lidar_vis_ros1.py
 
 # 第三个终端 使用RViz可视化场景和点云
-rosrun rviz rviz -d mujoco_lidar/examples/config/rviz_config.rviz
+rosrun rviz rviz -d examples/config/rviz_config.rviz
 ```
 
 这将在`/lidar_points`话题上发布PointCloud2格式的激光雷达扫描数据。
@@ -294,7 +305,7 @@ rosrun rviz rviz -d mujoco_lidar/examples/config/rviz_config.rviz
 `lidar_vis_ros1.py`支持以下命令行参数：
 
 ```bash
-python mujoco_lidar/examples/lidar_vis_ros1.py [options]
+python examples/lidar_vis_ros1.py [options]
 
 选项:
   --lidar MODEL      指定激光雷达型号，可选值:
@@ -309,7 +320,7 @@ python mujoco_lidar/examples/lidar_vis_ros1.py [options]
 
 示例：使用HDL64激光雷达，启用性能分析，设置发布频率为10Hz
 ```bash
-python mujoco_lidar/examples/lidar_vis_ros1.py --lidar HDL64 --profiling --rate 10
+python examples/lidar_vis_ros1.py --lidar HDL64 --profiling --rate 10
 ```
 
 #### 键盘交互
@@ -325,10 +336,10 @@ python mujoco_lidar/examples/lidar_vis_ros1.py --lidar HDL64 --profiling --rate 
 
 ```bash
 # 第一个终端
-python mujoco_lidar/examples/lidar_vis_ros2.py
+python examples/lidar_vis_ros2.py
 
 # 第二个终端 使用RViz2可视化场景和点云
-ros2 run rviz2 rviz2 -d mujoco_lidar/examples/config/rviz_config.rviz
+ros2 run rviz2 rviz2 -d examples/config/rviz_config.rviz
 ```
 
 这将在`/lidar_points`话题上发布PointCloud2格式的激光雷达扫描数据。
@@ -338,7 +349,7 @@ ros2 run rviz2 rviz2 -d mujoco_lidar/examples/config/rviz_config.rviz
 `lidar_vis_ros2.py`支持与ROS1示例相同的命令行参数：
 
 ```bash
-python mujoco_lidar/examples/lidar_vis_ros2.py [options]
+python examples/lidar_vis_ros2.py [options]
 
 选项:
   --lidar MODEL      指定激光雷达型号，可选值同ROS1示例
@@ -360,7 +371,7 @@ python mujoco_lidar/examples/lidar_vis_ros2.py [options]
 运行性能测试以评估激光雷达仿真性能：
 
 ```bash
-python mujoco_lidar/examples/test_speed.py --verbose
+python examples/test_speed.py --verbose
 ```
 
 这将测试115,200射线（相当于1800×64分辨率）的性能，并显示详细的计时信息。

@@ -1,6 +1,7 @@
 import mujoco
 import numpy as np
 import taichi as ti
+from mesh_tracer import MeshTracer
 from tibvh import AABB, LBVH
 from tibvh.geometry import (
     ray_plane_distance,
@@ -34,19 +35,12 @@ class MjLidarWrapper:
         self.geom_aabb_size.from_numpy(mj_model.geom_aabb[:,3:])
 
         # build mesh
-        self.face_addr = ti.field(dtype=ti.i32, shape=mj_model.mesh_faceadr.shape)
-        self.face_num = ti.field(dtype=ti.i32, shape=mj_model.mesh_facenum.shape)
-        self.mesh_face = ti.field(dtype=ti.i32, shape=mj_model.mesh_face.shape)
-        self.vert_addr = ti.field(dtype=ti.i32, shape=mj_model.mesh_vertadr.shape)
-        self.vert_num = ti.field(dtype=ti.i32, shape=mj_model.mesh_vertnum.shape)
-        self.mesh_vert = ti.field(dtype=ti.f32, shape=mj_model.mesh_vert.shape)
-
-        self.face_addr.from_numpy(mj_model.mesh_faceadr.astype(np.int32))
-        self.face_num.from_numpy(mj_model.mesh_facenum.astype(np.int32))
-        self.mesh_face.from_numpy(mj_model.mesh_face.astype(np.int32))
-        self.vert_addr.from_numpy(mj_model.mesh_vertadr.astype(np.int32))
-        self.vert_num.from_numpy(mj_model.mesh_vertnum.astype(np.int32))
-        self.mesh_vert.from_numpy(mj_model.mesh_vert.astype(np.float32))
+        self.mesh_tracers = []
+        for i in range(mj_model.nmesh):
+            vertices = mj_model.mesh_vert
+            faces = mj_model.mesh_face[mj_model.mesh_faceadr[i]:mj_model.mesh_faceadr[i]+mj_model.mesh_facenum[i]]
+            mesh_tracer = MeshTracer(vertices, faces, max_candidates=self.max_candidates)
+            self.mesh_tracers.append(mesh_tracer)
 
         # build scene manager
         self.scene_aabb_manager = AABB(max_n_aabbs=self.ngeom)
@@ -133,6 +127,7 @@ class MjLidarWrapper:
                 geom_center = self.geom_positions[geom_id]
                 geom_size = self.geom_sizes[geom_id]
                 geom_rot = self.geom_rotations[geom_id]
+                geom_data_id = self.geom_data_ids[geom_id]
 
                 if geom_type == 0:  # PLANE
                     t_hit = ray_plane_distance(o, ray_dir, geom_center, geom_size, geom_rot)
@@ -146,10 +141,11 @@ class MjLidarWrapper:
                     t_hit = ray_cylinder_distance(o, ray_dir, geom_center, geom_size, geom_rot)
                 elif geom_type == 6:  # BOX
                     t_hit = ray_box_distance(o, ray_dir, geom_center, geom_size, geom_rot)
-                elif geom_type == 7:  # MESH
-                    # TODO
-                    # t_hit = self.ray_mesh_intersection(o, ray_dir, data_id, center, rotation)
-                    pass
+                elif geom_type == 7 and -1 < geom_data_id:  # MESH
+                    # TODO global to mesh local
+                    o_local = o
+                    dir_local = ray_dir
+                    t_hit = self.mesh_tracers[geom_data_id].trace(o_local, dir_local)
 
                 if 0 <= t_hit and t_hit < best_t:
                     best_t = t_hit

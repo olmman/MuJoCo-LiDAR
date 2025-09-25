@@ -6,9 +6,7 @@ from tibvh.geometry import ray_triangle_distance
 
 @ti.data_oriented
 class MeshTracer:
-    def __init__(self, vertices_np, faces_np, max_candidates: int = 32):
-        self.max_candidates = max_candidates
-        
+    def __init__(self, vertices_np, faces_np, max_candidates: int = 32): 
         n_faces = faces_np.shape[0]
 
         v0 = vertices_np[self.faces_np[:, 0]].astype(np.float32)
@@ -35,26 +33,17 @@ class MeshTracer:
                 self.aabb_manager.aabbs[i].max = aabb_maxs[i]
         _fill_aabb_manager()
 
-        self.lbvh = LBVH(self.aabb_manager, max_candidates=self.max_candidates, profiling=False)
+        self.lbvh = LBVH(self.aabb_manager, max_candidates=max_candidates, profiling=False)
         self.lbvh.build()
         ti.sync()
-
-        self._overflow = ti.field(dtype=ti.i32, shape=())
-
-    @ti.func
-    def _reset_overflow(self):
-        self._overflow[None] = 0
 
     @ti.func
     def trace(self,
               origin: ti.types.ndarray(dtype=ti.f32, ndim=1),
               ray_dir: ti.types.ndarray(dtype=ti.f32, ndim=1),
     ):
-        self._reset_overflow()
         distances = -1.0
         candidates, candidates_count = self.lbvh.collect_intersecting_elements(origin, ray_dir)
-        if candidates_count >= self.max_candidates-1:
-            ti.atomic_add(self._overflow[None], 1)
         best_t = 1e10
         for c in range(candidates_count):
             tri_id = candidates[c]

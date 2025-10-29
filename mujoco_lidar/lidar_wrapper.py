@@ -13,9 +13,9 @@ class MjLidarWrapper:
         args (dict): Additional backend-specific arguments. Default: {}
         
             CPU Backend Arguments:
-                geomgroup (int | None): Geometry group filter (0-5, or None for all). Default: None
+                geomgroup (np.ndarray | None): Geometry group filter (0-5, or None for all). Default: None
                     - None: Detect all geometries
-                    - 0-5: Only detect geometries in the specified group
+                    - geomgroup is an array of length mjNGROUP, where 1 means the group should be included. Pass geomgroup=None to skip group exclusion.
                 bodyexclude (int): Body ID to exclude from detection. Default: -1
                     - -1: Don't exclude any body
                     - >= 0: Exclude all geometries of the specified body
@@ -37,7 +37,10 @@ class MjLidarWrapper:
         ...     site_name="lidar_site",
         ...     backend="cpu",
         ...     cutoff_dist=50.0,
-        ...     args={'bodyexclude': robot_body_id}
+        ...     args={
+        ...         'bodyexclude': robot_body_id,
+        ...         'geomgroup': np.array([1, 1, 1, 0, 0, 0], np.dtype=np.uint8)
+        ...     }   
         ... )
         
         >>> # GPU backend for complex scenes
@@ -47,13 +50,12 @@ class MjLidarWrapper:
         ...     backend="gpu",
         ...     cutoff_dist=100.0,
         ...     args={
+        ...         'bodyexclude': robot_body_id,
+        ...         'geomgroup': np.array([1, 1, 1, 0, 0, 0], np.dtype=np.uint8),
         ...         'max_candidates': 64,
         ...         'ti_init_args': {'device_memory_GB': 4.0}
         ...     }
         ... )
-    
-    See Also:
-        ARGS_DOCUMENTATION.md for detailed parameter descriptions and usage examples
     """
     
     def __init__(self, mj_model, site_name:str,
@@ -86,10 +88,14 @@ class MjLidarWrapper:
                 ti.init(arch=ti.gpu, **self.args.get('ti_init_args', {}))
             
             # Create GPU backend instance
+            geomgroup = self.args.get('geomgroup', None)
+            bodyexclude = self.args.get('bodyexclude', -1)
             max_candidates = self.args.get('max_candidates', 32)
             self._backend_instance = MjLidarTi(
                 self.mj_model, 
                 cutoff_dist=self.cutoff_dist,
+                geomgroup=geomgroup,
+                bodyexclude=bodyexclude,
                 max_candidates=max_candidates
             )
             

@@ -4,7 +4,7 @@ import numpy as np
 class MjLidarCPU:
     def __init__(self, 
                  mj_model:mujoco.MjModel, cutoff_dist:float=100.0, 
-                 geomgroup:int=None, bodyexclude:int=-1) -> None:
+                 geomgroup:np.ndarray=None, bodyexclude:int=-1) -> None:
 
         self.mj_model = mj_model
         self.cutoff_dist = cutoff_dist

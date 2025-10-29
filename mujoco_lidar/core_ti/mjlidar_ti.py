@@ -14,12 +14,11 @@ from tibvh.geometry import (
     aabb_local2wolrd
 )
 
-# from .mesh_tracer import MeshTracer
-
 @ti.data_oriented
 class MjLidarTi:
-    def __init__(self, mj_model:mujoco.MjModel, 
-                 cutoff_dist:float=100.0, max_candidates: int = 32):
+    def __init__(self, 
+                 mj_model:mujoco.MjModel, cutoff_dist:float=100.0, 
+                 geomgroup:np.ndarray=None, bodyexclude:int=-1, max_candidates: int = 32):
         self.max_candidates = max_candidates
         self._cutoff = min(cutoff_dist, 1e9)
 
@@ -37,23 +36,36 @@ class MjLidarTi:
         self.geom_sizes = ti.Vector.field(3, dtype=ti.f32, shape=(self.ngeom))
         self.geom_aabb_center = ti.Vector.field(3, dtype=ti.f32, shape=(self.ngeom))
         self.geom_aabb_size = ti.Vector.field(3, dtype=ti.f32, shape=(self.ngeom))
-        geom_types = mj_model.geom_type.astype(np.int32)
-        self.geom_types.from_numpy(geom_types)
+
+        aabb_center = mj_model.geom_aabb[:,:3].astype(np.float32).copy()
+        aabb_size = mj_model.geom_aabb[:,3:].astype(np.float32).copy()
+
+        geom_types = mj_model.geom_type.astype(np.int32).copy()
         geom_sizes = mj_model.geom_size.astype(np.float32).copy()
         cylinder_capsule_args = np.where((geom_types == 3) | (geom_types == 5))[0]
         geom_sizes[cylinder_capsule_args, 2] = geom_sizes[cylinder_capsule_args, 1]
         geom_sizes[cylinder_capsule_args, 1] = geom_sizes[cylinder_capsule_args, 0]
-        self.geom_sizes.from_numpy(geom_sizes)
 
-        aabb_center = mj_model.geom_aabb[:,:3].astype(np.float32).copy()
-        aabb_size = mj_model.geom_aabb[:,3:].astype(np.float32).copy()
         plane_args = np.where(mj_model.geom_type.astype(np.int32) == 0)[0]
         mesh_args = np.where(mj_model.geom_type.astype(np.int32) == 7)[0]
         aabb_center[plane_args, :] = 0
         aabb_size[plane_args, :] = mj_model.geom_size[plane_args, :]
         aabb_center[mesh_args, :] = 0.0
-        aabb_size[mesh_args, :] = 1e-6
+        aabb_size[mesh_args, :] = 1e-9
 
+        exclude_geoms_args = np.where(mj_model.geom_bodyid == bodyexclude)[0]
+        geom_types[exclude_geoms_args] = -1
+        aabb_size[exclude_geoms_args, :] = 1e-9
+
+        if geomgroup is not None:
+            for i in range(mujoco.mjNGROUP):
+                if not geomgroup[i]:
+                    exclude_group_args = np.where(mj_model.geom_group == i)[0]
+                    geom_types[exclude_group_args] = -1
+                    aabb_size[exclude_group_args, :] = 1e-9
+
+        self.geom_types.from_numpy(geom_types)
+        self.geom_sizes.from_numpy(geom_sizes)
         self.geom_aabb_center.from_numpy(aabb_center)
         self.geom_aabb_size.from_numpy(aabb_size)
 
@@ -61,7 +73,7 @@ class MjLidarTi:
             mesh_id_np = np.array([], dtype=np.int32)
             v0, v1, v2 = np.array([]), np.array([]), np.array([])
             for i, data_id in enumerate(mj_model.geom_dataid):
-                if data_id < 0 or data_id >= mj_model.nmesh:
+                if data_id < 0 or data_id >= mj_model.nmesh or geom_types[i] == -1:
                     continue
                 mesh_id_np = np.append(mesh_id_np, [i] * mj_model.mesh_facenum[data_id])
                 self.nface += mj_model.mesh_facenum[data_id]
@@ -218,7 +230,9 @@ class MjLidarTi:
                     geom_size = self.geom_sizes[geom_id]
                     geom_rot = self.geom_rotations[geom_id]
 
-                    if geom_type == 0:  # PLANE
+                    if geom_type == -1:  # exclude
+                        pass
+                    elif geom_type == 0:  # PLANE
                         t_hit = ray_plane_distance(o, ray_dir, geom_center, geom_size, geom_rot)
                     elif geom_type == 2:  # SPHERE
                         t_hit = ray_sphere_distance(o, ray_dir, geom_center, geom_size, geom_rot)

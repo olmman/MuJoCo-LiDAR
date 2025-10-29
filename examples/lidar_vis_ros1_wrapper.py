@@ -205,7 +205,7 @@ if __name__ == "__main__":
             viewer.opt.frame = mujoco.mjtFrame.mjFRAME_SITE.value
             viewer.opt.label = mujoco.mjtLabel.mjLABEL_SITE.value
 
-            while not rospy.is_shutdown() and kb_listener.running and viewer.is_running:
+            while not rospy.is_shutdown() and kb_listener.running and viewer.is_running():
 
                 # 更新mujoco中激光雷达site的位置和方向
                 site_position, site_orientation = kb_listener.update_lidar_pose(1./60.)

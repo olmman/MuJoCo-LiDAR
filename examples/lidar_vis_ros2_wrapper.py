@@ -131,7 +131,7 @@ def main():
             viewer.opt.label = mujoco.mjtLabel.mjLABEL_SITE.value
 
             lidar_pose = np.eye(4, dtype=np.float32) 
-            while rclpy.ok() and node.kb_listener.running and viewer.is_running:
+            while rclpy.ok() and node.kb_listener.running and viewer.is_running():
 
                 # 更新激光雷达位置和方向
                 site_position, site_orientation = node.kb_listener.update_lidar_pose(1./60.)

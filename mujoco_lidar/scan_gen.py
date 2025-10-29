@@ -50,6 +50,44 @@ class LivoxGenerator:
         return self.ray_out[:, 0], self.ray_out[:, 1]
 
 # =======================================================================
+# 生成网格状扫描模式
+# =======================================================================
+def generate_grid_scan_pattern(num_ray_cols, num_ray_rows, theta_range=(-np.pi, np.pi), phi_range=(-np.pi/3, np.pi/3)):
+    """
+    生成网格状扫描模式
+    
+    参数:
+        num_ray_cols: 水平方向射线数
+        num_ray_rows: 垂直方向射线数
+        
+    返回:
+        (ray_theta, ray_phi): 水平角和垂直角数组
+    """
+   # 创建网格扫描模式
+    theta_grid, phi_grid = np.meshgrid(
+        np.linspace(theta_range[0], theta_range[1], num_ray_cols),  # 水平角
+        np.linspace(phi_range[0], phi_range[1], num_ray_rows)  # 垂直角
+    )
+    
+    # 展平网格为一维数组
+    ray_phi = phi_grid.flatten()
+    ray_theta = theta_grid.flatten()
+    
+    # 打印扫描范围信息
+    print(f"扫描模式：phi范围[{ray_phi.min():.2f}, {ray_phi.max():.2f}], theta范围[{ray_theta.min():.2f}, {ray_theta.max():.2f}]")
+    return ray_theta, ray_phi
+
+# =======================================================================
+# 创建激光雷达扫描线的角度数组，仅包含水平方向
+# =======================================================================
+def create_lidar_single_line(horizontal_resolution=360, horizontal_fov=2*np.pi):
+    """创建激光雷达扫描线的角度数组，仅包含水平方向"""
+    h_angles = np.linspace(-horizontal_fov/2, horizontal_fov/2, horizontal_resolution)
+    v_angles = np.zeros_like(h_angles)
+    return h_angles, v_angles
+
+
+# =======================================================================
 # 1. Velodyne HDL-64 (任意 360° 旋转式激光雷达)
 # =======================================================================
 def generate_HDL64(     # |参数            | Velodyne HDL-64
@@ -137,38 +175,18 @@ def generate_os128(
     return theta_grid.flatten(), phi_grid.flatten()
 
 # =======================================================================
-# 4. 生成网格状扫描模式
+# 4. Robosense Airy-96 模式
+# https://www.robosense.cn/rslidar/Airy
 # =======================================================================
-def generate_grid_scan_pattern(num_ray_cols, num_ray_rows, theta_range=(-np.pi, np.pi), phi_range=(-np.pi/3, np.pi/3)):
-    """
-    生成网格状扫描模式
-    
-    参数:
-        num_ray_cols: 水平方向射线数
-        num_ray_rows: 垂直方向射线数
-        
-    返回:
-        (ray_theta, ray_phi): 水平角和垂直角数组
-    """
-   # 创建网格扫描模式
-    theta_grid, phi_grid = np.meshgrid(
-        np.linspace(theta_range[0], theta_range[1], num_ray_cols),  # 水平角
-        np.linspace(phi_range[0], phi_range[1], num_ray_rows)  # 垂直角
-    )
-    
-    # 展平网格为一维数组
-    ray_phi = phi_grid.flatten()
-    ray_theta = theta_grid.flatten()
-    
-    # 打印扫描范围信息
-    print(f"扫描模式：phi范围[{ray_phi.min():.2f}, {ray_phi.max():.2f}], theta范围[{ray_theta.min():.2f}, {ray_theta.max():.2f}]")
-    return ray_theta, ray_phi
+def generate_airy96():
+    # 垂直角参数（均匀分布）
+    n_channels = 96
+    phi = np.deg2rad(np.linspace(0., 90.0, n_channels))  # shape: (n_channels,)
 
-# =======================================================================
-# 5. 创建激光雷达扫描线的角度数组，仅包含水平方向
-# =======================================================================
-def create_lidar_single_line(horizontal_resolution=360, horizontal_fov=2*np.pi):
-    """创建激光雷达扫描线的角度数组，仅包含水平方向"""
-    h_angles = np.linspace(-horizontal_fov/2, horizontal_fov/2, horizontal_resolution)
-    v_angles = np.zeros_like(h_angles)
-    return h_angles, v_angles
+    # 水平角计算
+    theta = np.deg2rad(np.linspace(-180., 180.0, 900))  # shape: (n_channels,)
+    
+    # 广播生成网格
+    theta_grid, phi_grid = np.meshgrid(theta, phi)
+    
+    return theta_grid.flatten(), phi_grid.flatten()

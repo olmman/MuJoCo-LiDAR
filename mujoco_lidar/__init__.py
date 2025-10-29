@@ -7,11 +7,12 @@ __all__ = [
     # Scan generation functions (imported lazily via __getattr__)
     "LivoxGeneratorTi",
     "LivoxGenerator",  # From scan_gen_livox (requires taichi)
+    "generate_grid_scan_pattern",
+    "create_lidar_single_line"
     "generate_HDL64",  # From scan_gen (no taichi needed)
     "generate_vlp32", 
     "generate_os128",
-    "generate_grid_scan_pattern",
-    "create_lidar_single_line"
+    "generate_airy96"
 ]
 
 def __getattr__(name):
@@ -21,8 +22,8 @@ def __getattr__(name):
         from mujoco_lidar.scan_gen_livox_ti import LivoxGeneratorTi
         return LivoxGeneratorTi
     # Other scan functions don't require taichi - import from scan_gen
-    elif name in ["LivoxGenerator", "generate_HDL64", "generate_vlp32", "generate_os128", 
-                  "generate_grid_scan_pattern", "create_lidar_single_line"]:
+    elif name in ["LivoxGenerator", "generate_grid_scan_pattern", "create_lidar_single_line",
+                  "generate_HDL64", "generate_vlp32", "generate_os128", "generate_airy96"]:
         from mujoco_lidar import scan_gen
         return getattr(scan_gen, name)
     raise AttributeError(f"module '{__name__}' has no attribute '{name}'")

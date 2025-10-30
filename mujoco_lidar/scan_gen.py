@@ -181,7 +181,7 @@ def generate_os128(
 def generate_airy96():
     # 垂直角参数（均匀分布）
     n_channels = 96
-    phi = np.deg2rad(np.linspace(0., 90.0, n_channels))  # shape: (n_channels,)
+    phi = np.deg2rad(np.linspace(0., 89.5, n_channels))  # shape: (n_channels,)
 
     # 水平角计算
     theta = np.deg2rad(np.linspace(-180., 180.0, 900))  # shape: (n_channels,)

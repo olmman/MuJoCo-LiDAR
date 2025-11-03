@@ -1,4 +1,6 @@
 import os
+import subprocess
+import signal
 import time
 import argparse
 import traceback
@@ -151,8 +153,11 @@ if __name__ == "__main__":
 
     forder_path = os.path.dirname(os.path.abspath(__file__))
     cmd = f"rosrun rviz rviz -d {forder_path}/config/rviz_config.rviz"
-    print(f"在终端执行命令以开启rviz可视化:\n {cmd}")
+    print(f"正在启动rviz可视化:\n {cmd}")
     print("=" * 60)
+
+    # 启动 rviz 进程
+    rviz_process = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid)
 
     # 初始化ROS节点
     rospy.init_node('mujoco_lidar_test', anonymous=True)
@@ -263,4 +268,14 @@ if __name__ == "__main__":
     except Exception as e:
         traceback.print_exc()
     finally:
+        # 关闭 rviz 进程
+        print("正在关闭 rviz 进程...")
+        try:
+            os.killpg(os.getpgid(rviz_process.pid), signal.SIGTERM)
+            rviz_process.wait(timeout=5)
+            print("rviz 进程已关闭")
+        except:
+            print("强制关闭 rviz 进程...")
+            os.killpg(os.getpgid(rviz_process.pid), signal.SIGKILL)
+            print("rviz 进程已强制关闭")
         print("程序结束")

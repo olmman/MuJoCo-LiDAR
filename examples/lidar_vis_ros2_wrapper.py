@@ -1,5 +1,7 @@
 import os
 import time
+import subprocess
+import signal
 import argparse
 import threading
 import traceback
@@ -106,8 +108,11 @@ def main():
 
     forder_path = os.path.dirname(os.path.abspath(__file__))
     cmd = f"ros2 run rviz2 rviz2 -d {forder_path}/config/rviz2_config.rviz"
-    print(f"在终端执行命令以开启rviz可视化:\n {cmd}")
+    print(f"正在启动rviz2可视化:\n {cmd}")
     print("=" * 60)
+
+    # 启动 rviz2 进程
+    rviz_process = subprocess.Popen(cmd, shell=True, preexec_fn=os.setsid)
 
     # 初始化ROS2
     rclpy.init()
@@ -193,6 +198,16 @@ def main():
         if hasattr(node, 'kb_listener'):
             del node.kb_listener
             print("键盘监听器已清理")
+        # 关闭 rviz2 进程
+        print("正在关闭 rviz2 进程...")
+        try:
+            os.killpg(os.getpgid(rviz_process.pid), signal.SIGTERM)
+            rviz_process.wait(timeout=5)
+            print("rviz2 进程已关闭")
+        except:
+            print("强制关闭 rviz2 进程...")
+            os.killpg(os.getpgid(rviz_process.pid), signal.SIGKILL)
+            print("rviz2 进程已强制关闭")
         # 清理资源
         spin_thread.join()
         node.destroy_node()

@@ -2,6 +2,7 @@
 
 A high-performance LiDAR simulation tool based on MuJoCo, supporting both CPU and GPU backends, with powerful GPU parallel computing powered by the Taichi programming language.
 
+![demo](./assets/go2.png)
 ![demo](./assets/lidar_rviz.png)
 
 [中文文档](README_zh.md)
@@ -317,11 +318,8 @@ ROS1 related dependencies need to be installed in advance
 # First terminal: Start ROS core
 roscore
 
-# Second terminal: Run LiDAR simulation (using GPU backend)
+# Second terminal: Run LiDAR simulation (using GPU backend). RViz will be automatically launched.
 python examples/lidar_vis_ros1_wrapper.py --lidar mid360 --rate 12
-
-# Third terminal: Visualize with RViz
-rosrun rviz rviz -d examples/config/rviz_config.rviz
 ```
 
 ### ROS2 Examples
@@ -329,17 +327,14 @@ rosrun rviz rviz -d examples/config/rviz_config.rviz
 **Approach 1: Using Wrapper (Recommended)**
 
 ```bash
-# First terminal: Run LiDAR simulation
+# Run LiDAR simulation. RViz2 will be automatically launched.
 python examples/lidar_vis_ros2_wrapper.py --lidar mid360 --rate 12
-
-# Second terminal: Visualize with RViz2
-ros2 run rviz2 rviz2 -d examples/config/rviz2_config.rviz
 ```
 
 **Approach 2: Using Core (Advanced)**
 
 ```bash
-# Using low-level GPU Core API
+# Using low-level GPU Core API. RViz2 will be automatically launched.
 python examples/lidar_vis_ros2.py --lidar mid360 --rate 12
 ```
 
@@ -372,6 +367,12 @@ python examples/lidar_vis_ros2_wrapper.py --lidar vlp32
 
 # Use custom scan pattern
 python examples/lidar_vis_ros2_wrapper.py --lidar custom
+
+# Integration with Unitree Go2 robot
+# Install onnx runtime
+pip install onnxruntime
+python examples/go2_ros2.py --lidar mid360
+# Choose other lidar --lidar airy
 ```
 
 ### Keyboard Controls

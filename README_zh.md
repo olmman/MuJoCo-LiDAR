@@ -2,6 +2,7 @@
 
 基于MuJoCo的高性能激光雷达仿真工具，支持CPU和GPU两种后端，由Taichi编程语言提供强大的GPU并行计算支持。
 
+![demo](./assets/go2.png)
 ![demo](./assets/lidar_rviz.png)
 
 [English Document](README.md)
@@ -54,6 +55,8 @@ pip install -e ".[gpu]"
 - GPU后端需要配置好cuda的nvidia显卡或其他Taichi支持的GPU
 
 ## 📚 使用示例
+
+[ros集成](#-ros集成)提供了快速上手的ros1/2的示例。
 
 MuJoCo-LiDAR 提供两种使用方式和两种后端选择：
 
@@ -317,11 +320,8 @@ MuJoCo-LiDAR提供了完整的ROS1和ROS2集成示例，支持点云发布和场
 # 第一个终端：启动ROS核心
 roscore
 
-# 第二个终端：运行激光雷达仿真（使用GPU后端）
+# 第二个终端：运行激光雷达仿真（使用GPU后端） 会自动开启rviz可视化
 python examples/lidar_vis_ros1_wrapper.py --lidar mid360 --rate 12
-
-# 第三个终端：使用RViz可视化
-rosrun rviz rviz -d examples/config/rviz_config.rviz
 ```
 
 ### ROS2示例
@@ -329,11 +329,8 @@ rosrun rviz rviz -d examples/config/rviz_config.rviz
 **方式一：使用Wrapper（推荐）**
 
 ```bash
-# 第一个终端：运行激光雷达仿真
+# 运行激光雷达仿真 同时会自动开启rviz可视化
 python examples/lidar_vis_ros2_wrapper.py --lidar mid360 --rate 12
-
-# 第二个终端：使用RViz2可视化
-ros2 run rviz2 rviz2 -d examples/config/rviz2_config.rviz
 ```
 
 **方式二：使用Core（高级）**
@@ -372,6 +369,12 @@ python examples/lidar_vis_ros2_wrapper.py --lidar vlp32
 
 # 使用自定义扫描模式
 python examples/lidar_vis_ros2_wrapper.py --lidar custom
+
+# 和宇树Go2机器狗的集成
+# 安装 onnx runtime
+pip install onnxruntime
+python examples/go2_ros2.py --lidar mid360
+# 选择其他lidar --lidar ariy
 ```
 
 ### 键盘交互控制

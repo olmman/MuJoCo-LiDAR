@@ -2,8 +2,14 @@
 
 基于MuJoCo的高性能激光雷达仿真工具，支持CPU和GPU两种后端，由Taichi编程语言提供强大的GPU并行计算支持。
 
-![demo](./assets/go2.png)
-![demo](./assets/lidar_rviz.png)
+<p align="center">
+  <img src="./assets/go2.png" width="49%" />
+  <img src="./assets/g1.png" width="49%" />
+</p>
+<p align="center">
+  <img src="./assets/lidar_rviz.png" width="65%" />
+</p>
+
 
 [English Document](README.md)
 
@@ -56,7 +62,7 @@ pip install -e ".[gpu]"
 
 ## 📚 使用示例
 
-[ros集成](#-ros集成)提供了快速上手的ros1/2的示例。
+[ros集成](#-ros集成)提供了快速上手的ros1/2的示例，[宇树Go2/G1](#-更多示例)。
 
 MuJoCo-LiDAR 提供两种使用方式和两种后端选择：
 
@@ -369,12 +375,6 @@ python examples/lidar_vis_ros2_wrapper.py --lidar vlp32
 
 # 使用自定义扫描模式
 python examples/lidar_vis_ros2_wrapper.py --lidar custom
-
-# 和宇树Go2机器狗的集成
-# 安装 onnx runtime
-pip install onnxruntime
-python examples/go2_ros2.py --lidar mid360
-# 选择其他lidar --lidar ariy
 ```
 
 ### 键盘交互控制
@@ -458,6 +458,22 @@ pose_4x4[:3, :3] = mj_data.site("lidar_site").xmat.reshape(3, 3)
 lidar.update(mj_data)
 lidar.trace_rays(pose_4x4, rays_theta_ti, rays_phi_ti)
 points = lidar.get_hit_points()  # 从GPU拷贝到CPU
+```
+
+## 🤝 更多示例
+
+我们还提供了宇树机器狗go2和人形机器人g1的ros2集成。
+
+```bash
+# 安装 onnx runtime
+pip install onnxruntime
+
+# go2 example
+python examples/unitree_go2_ros2.py --lidar mid360
+# 选择其他lidar，例如： --lidar ariy
+
+# go1 example
+python examples/unitree_g1_ros2.py --lidar mid360
 ```
 
 ## ⚡ 性能优化与最佳实践
@@ -553,3 +569,17 @@ rays_theta, rays_phi = livox_gen.sample_ray_angles()
 ## 📄 许可证
 
 本项目采用MIT许可证 - 详见[LICENSE](LICENSE)文件
+
+## 📜 Citation
+
+如果发现MuJoCo-LiDAR对您的研究有用的话，请考虑引用我们的工作：
+
+```bibtex
+@article{wu2025fggs,
+  title={FGGS-LiDAR: Ultra-Fast, GPU-Accelerated Simulation from General 3DGS Models to LiDAR},
+  author={Wu, Junzhe and Jia, Yufei and Yan, Yiyi and Chen, Zhixing and Tan, Tiao and Wang, Zifan and Wang, Guangyu},
+  journal={arXiv preprint arXiv:2509.17390},
+  year={2025},
+  url={https://arxiv.org/abs/2509.17390}
+}
+```

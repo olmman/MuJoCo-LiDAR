@@ -2,8 +2,13 @@
 
 A high-performance LiDAR simulation tool based on MuJoCo, supporting both CPU and GPU backends, with powerful GPU parallel computing powered by the Taichi programming language.
 
-![demo](./assets/go2.png)
-![demo](./assets/lidar_rviz.png)
+<p align="center">
+  <img src="./assets/go2.png" width="49%" />
+  <img src="./assets/g1.png" width="49%" />
+</p>
+<p align="center">
+  <img src="./assets/lidar_rviz.png" width="65%" />
+</p>
 
 [中文文档](README_zh.md)
 
@@ -55,6 +60,8 @@ pip install -e ".[gpu]"
 - GPU backend requires nvidia GPU with CUDA or a Taichi-supported GPU
 
 ## 📚 Usage Examples
+
+[ROS Integration](#-ros-integration) provides quick start examples for ROS1/2, and [Unitree Go2/G1](#-more-examples).
 
 MuJoCo-LiDAR provides two usage approaches and two backend options:
 
@@ -368,11 +375,6 @@ python examples/lidar_vis_ros2_wrapper.py --lidar vlp32
 # Use custom scan pattern
 python examples/lidar_vis_ros2_wrapper.py --lidar custom
 
-# Integration with Unitree Go2 robot
-# Install onnx runtime
-pip install onnxruntime
-python examples/go2_ros2.py --lidar mid360
-# Choose other lidar --lidar airy
 ```
 
 ### Keyboard Controls
@@ -456,6 +458,22 @@ pose_4x4[:3, :3] = mj_data.site("lidar_site").xmat.reshape(3, 3)
 lidar.update(mj_data)
 lidar.trace_rays(pose_4x4, rays_theta_ti, rays_phi_ti)
 points = lidar.get_hit_points()  # Copy from GPU to CPU
+```
+
+## 🤝 More Examples
+
+We also provide ROS2 integration examples with Unitree Go2 quadruped robot and G1 humanoid robot.
+
+```bash
+# Install onnx runtime
+pip install onnxruntime
+
+# go2 example
+python examples/unitree_go2_ros2.py --lidar mid360
+# Choose other lidar, for example: --lidar airy
+
+# g1 example
+python examples/unitree_g1_ros2.py --lidar mid360
 ```
 
 ## ⚡ Performance Optimization and Best Practices
@@ -551,3 +569,18 @@ rays_theta, rays_phi = livox_gen.sample_ray_angles()
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details
+
+## 📜 Citation
+
+If you find MuJoCo-LiDAR useful in your research, please consider citing our work:
+
+```bibtex
+@article{wu2025fggs,
+  title={FGGS-LiDAR: Ultra-Fast, GPU-Accelerated Simulation from General 3DGS Models to LiDAR},
+  author={Wu, Junzhe and Jia, Yufei and Yan, Yiyi and Chen, Zhixing and Tan, Tiao and Wang, Zifan and Wang, Guangyu},
+  journal={arXiv preprint arXiv:2509.17390},
+  year={2025},
+  url={https://arxiv.org/abs/2509.17390}
+}
+```
+

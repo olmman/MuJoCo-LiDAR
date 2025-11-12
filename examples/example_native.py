@@ -1,12 +1,15 @@
 import time
 import numpy as np
+from etils import epath
+import matplotlib.pyplot as plt
 
 import mujoco
 import mujoco.viewer
 from mujoco_lidar import MjLidarWrapper, scan_gen
 
 if __name__ == "__main__":
-    mj_model = mujoco.MjModel.from_xml_path("../models/demo.xml")    
+    mjcf_file = epath.Path(__file__).parent.parent / "models" / "demo.xml"
+    mj_model = mujoco.MjModel.from_xml_path(mjcf_file.as_posix())
     mj_data = mujoco.MjData(mj_model)
 
     update_rate = 12.0  # Hz
@@ -34,6 +37,7 @@ if __name__ == "__main__":
 
         print("Starting simulation...")
         print("Number of rays:", rays_theta.shape[0])
+        cmap = plt.get_cmap('hsv')  # 或使用 'jet', 'viridis', 'plasma' 等
 
         _last_time = 1e6
         while viewer.is_running():
@@ -50,8 +54,22 @@ if __name__ == "__main__":
                 lidar.trace_rays(mj_data, rays_theta, rays_phi)
                 points = lidar.get_hit_points()
                 world_points = points @ lidar.sensor_rotation.T + lidar.sensor_position
+
+                # 根据高度设置颜色
+                z_values = world_points[:, 2]
+                z_min, z_max = z_values.min(), z_values.max()
+                if z_max > z_min:
+                    # 归一化高度值到 [0, 1]
+                    z_norm = (z_values - z_min) / (z_max - z_min)
+                else:
+                    z_norm = np.zeros_like(z_values)
+                
+                # 使用 matplotlib 颜色映射
+                colors = cmap(z_norm)  # 返回 RGBA 值，shape: (N, 4)
+
                 for i in range(viewer.user_scn.ngeom):
                     viewer.user_scn.geoms[i].pos[:] = world_points[i]
+                    viewer.user_scn.geoms[i].rgba[:] = colors[i]
 
             viewer.sync()
             run_time = time.time() - _start_time

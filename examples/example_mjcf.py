@@ -2,6 +2,7 @@ import os
 import time
 import threading
 import queue
+from etils import epath
 
 import mujoco
 import mujoco.viewer
@@ -42,14 +43,6 @@ def mujoco_simulation_thread(mj_model, mj_data, lidar_sensor, rays_theta, rays_p
 
                     # 执行光线投射
                     points = lidar_sensor.get_hit_points()
-                    if lidar_sim_cnt == 0:
-                        print("points basic info:")
-                        print("  .shape:", points.shape)
-                        print("  .dtype:", points.dtype)
-                        print("  x.min():", points[:, 0].min(), "x.max():", points[:, 0].max())
-                        print("  y.min():", points[:, 1].min(), "y.max():", points[:, 1].max())
-                        print("  z.min():", points[:, 2].min(), "z.max():", points[:, 2].max())
-
                     # 将点云数据放入队列，如果队列满了就清空后再放入
                     try:
                         point_queue.put_nowait(points.copy())
@@ -77,13 +70,16 @@ def main():
     global running
     
     # print help
+    print("="*100)
     print("在Mujoco Viewer视图，双击选中MoCap物体（带坐标系的红色透明方块 lidar_site）")
     print("选中后，按住ctrl，按下鼠标右键拖动平移视角")
     print("按住ctrl，按下鼠标左键拖动旋转视角")
     print("关闭任意一个窗口都会退出整个程序")
+    print("="*100)
     
     # 从文件加载MuJoCo模型
-    mj_model = mujoco.MjModel.from_xml_path("../models/demo.xml")    
+    mjcf_file = epath.Path(__file__).parent.parent / "models" / "demo.xml"
+    mj_model = mujoco.MjModel.from_xml_path(mjcf_file.as_posix())
     mj_data = mujoco.MjData(mj_model)
     mujoco.mj_forward(mj_model, mj_data)
 

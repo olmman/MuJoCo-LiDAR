@@ -1,4 +1,5 @@
 import os
+from etils import epath
 import mujoco
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
@@ -9,7 +10,8 @@ os.chdir(os.path.dirname(os.path.abspath(__file__)))
 
 def main():
     # 从文件加载MuJoCo模型
-    mj_model = mujoco.MjModel.from_xml_path("../models/demo.xml")    
+    mjcf_file = epath.Path(__file__).parent.parent / "models" / "demo.xml"
+    mj_model = mujoco.MjModel.from_xml_path(mjcf_file.as_posix())
     mj_data = mujoco.MjData(mj_model)
     mujoco.mj_forward(mj_model, mj_data)
 

@@ -118,16 +118,9 @@ class MjLidarWrapper:
         """Initialize JAX backend"""
         try:
             from mujoco_lidar.core_jax.mjlidar_jax import MjLidarJax
-            import mujoco
-            from mujoco import mjx
             
-            # Ensure we have an mjx.Model
-            if isinstance(self.mj_model, mujoco.MjModel):
-                self.mjx_model = mjx.put_model(self.mj_model)
-            else:
-                self.mjx_model = self.mj_model
-                
-            self._backend_instance = MjLidarJax(self.mjx_model, geom_ids=self.args.get('geom_ids'))
+            # Pass mj_model directly. MjLidarJax will extract what it needs.
+            self._backend_instance = MjLidarJax(self.mj_model, geom_ids=self.args.get('geom_ids'))
             
         except ImportError as e:
             raise ImportError(
@@ -172,49 +165,23 @@ class MjLidarWrapper:
     def trace_rays(self, mj_data, ray_theta, ray_phi, site_name:str=None):
         """
         Trace rays.
-        For JAX backend, mj_data can be mjx.Data or mujoco.MjData.
+        For JAX backend, mj_data can be mujoco.MjData.
         """
         target_site = self.site_name if site_name is None else site_name
 
         if self.backend == "jax":
             import jax.numpy as jnp
-            import mujoco
             
             # Get site ID
             site_id = self.mj_model.site(target_site).id
             
-            # Check if mj_data is mjx.Data or mujoco.MjData
-            is_mjx = hasattr(mj_data, 'qpos') and hasattr(mj_data.qpos, 'devices') # Simple check for JAX array
+            # Assume single environment (CPU MjData)
+            # Extract data needed for rendering
+            sensor_pos = jnp.array(mj_data.site(target_site).xpos)
+            sensor_mat = jnp.array(mj_data.site(target_site).xmat.reshape(3, 3))
             
-            if is_mjx:
-                # mjx.Data
-                is_batched = mj_data.qpos.ndim > 1
-                if is_batched:
-                    sensor_pos = mj_data.site_xpos[..., site_id, :]
-                    sensor_mat = mj_data.site_xmat[..., site_id, :, :]
-                else:
-                    sensor_pos = mj_data.site_xpos[site_id]
-                    sensor_mat = mj_data.site_xmat[site_id]
-            else:
-                # mujoco.MjData (CPU)
-                # We need to extract data and convert to JAX array
-                # This is slow but functional for testing
-                is_batched = False
-                sensor_pos = jnp.array(mj_data.site(target_site).xpos)
-                sensor_mat = jnp.array(mj_data.site(target_site).xmat.reshape(3, 3))
-                
-                # We also need to pass geometry data if MjLidarJax expects it from data
-                # MjLidarJax.render expects `mjx_data` which has `geom_xpos` and `geom_xmat`
-                # If we pass a dummy object or a dict, MjLidarJax needs to handle it.
-                # Let's create a lightweight namedtuple or class to mimic mjx.Data structure for geoms
-                
-                class MiniData:
-                    def __init__(self, d):
-                        self.geom_xpos = jnp.array(d.geom_xpos)
-                        self.geom_xmat = jnp.array(d.geom_xmat)
-                
-                mj_data_proxy = MiniData(mj_data)
-                mj_data = mj_data_proxy # Swap for the call
+            geom_xpos = jnp.array(mj_data.geom_xpos)
+            geom_xmat = jnp.array(mj_data.geom_xmat)
 
             # Convert angles to local rays
             theta = jnp.array(ray_theta)
@@ -226,14 +193,10 @@ class MjLidarWrapper:
             local_rays = jnp.stack([x, y, z], axis=-1) # (Nrays, 3)
             
             # Transform to world rays
-            if is_batched:
-                world_rays = jnp.einsum('...ij,nj->...ni', sensor_mat, local_rays)
-            else:
-                world_rays = local_rays @ sensor_mat.T
+            world_rays = local_rays @ sensor_mat.T
                 
             # Render
-            # If we swapped mj_data for a proxy, use it.
-            self._distances = self._backend_instance.render(mj_data, sensor_pos, world_rays)
+            self._distances = self._backend_instance.render(geom_xpos, geom_xmat, sensor_pos, world_rays)
             
             return self._distances
             

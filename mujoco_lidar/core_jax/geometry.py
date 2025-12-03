@@ -24,46 +24,68 @@ def ray_sphere_intersection(ray_origin, ray_dir, sphere_pos, sphere_radius):
     
     sqrt_delta = jnp.sqrt(jnp.maximum(0.0, delta))
     t1 = -b - sqrt_delta
-    t2 = -b + sqrt_delta
+    # t2 = -b + sqrt_delta
     
-    # We want the smallest positive t
-    # Cases:
-    # 1. t1 > 0: t1 is the first hit (outside)
-    # 2. t1 <= 0 and t2 > 0: t2 is the first hit (inside)
-    # 3. t2 <= 0: both behind (no hit)
+    # Check if inside
+    dist_sq = jnp.dot(m, m)
+    is_inside = dist_sq <= sphere_radius * sphere_radius
     
-    t = jnp.where(t1 > 0, t1, jnp.where(t2 > 0, t2, jnp.inf))
+    # If outside, we want the first hit t1
+    t = jnp.where(t1 > 0, t1, jnp.inf)
+    
+    # If inside, return 0.0
+    t = jnp.where(is_inside, 0.0, t)
+    
     t = jnp.where(delta < 0, jnp.inf, t)
     
     return t
 
-def ray_plane_intersection(ray_origin, ray_dir, plane_pos, plane_normal):
+def ray_plane_intersection(ray_origin, ray_dir, plane_pos, plane_rot, plane_size):
     """
     Calculate intersection between a ray and a plane.
-    Plane is defined by a point and a normal.
-    In MuJoCo, planes are often infinite.
+    Plane is defined by position, rotation, and half-sizes.
+    Local Z axis is normal.
     
     Args:
         ray_origin: (3,)
         ray_dir: (3,)
-        plane_pos: (3,) Point on plane
-        plane_normal: (3,) Plane normal (normalized)
+        plane_pos: (3,) Plane center
+        plane_rot: (3, 3) Plane rotation
+        plane_size: (3,) Plane half-sizes (x, y, z ignored)
         
     Returns:
         t: scalar
     """
-    denom = jnp.dot(ray_dir, plane_normal)
+    # Transform to local space
+    ro = jnp.dot(plane_rot.T, ray_origin - plane_pos)
+    rd = jnp.dot(plane_rot.T, ray_dir)
     
-    # Check if ray is parallel to plane (denom ~ 0)
-    # We use a small epsilon
+    # Intersection with z=0 plane
+    # ro.z + t * rd.z = 0  =>  t = -ro.z / rd.z
+    
+    denom = rd[2]
+    
+    # Avoid division by zero
+    safe_denom = denom + 1e-10 * jnp.sign(denom)
+    t = -ro[2] / safe_denom
+    
+    # Check bounds
+    hit_pos = ro + t * rd
+    
+    hx = plane_size[0]
+    hy = plane_size[1]
+    
+    # Check if infinite (size=0)
+    is_infinite = (hx == 0.0) & (hy == 0.0)
+    
+    in_bounds = (jnp.abs(hit_pos[0]) <= hx) & (jnp.abs(hit_pos[1]) <= hy)
+    
+    # Valid if t > 0 and (in_bounds or infinite) and not parallel
     is_parallel = jnp.abs(denom) < 1e-6
     
-    t = jnp.dot(plane_pos - ray_origin, plane_normal) / (denom + 1e-10 * jnp.sign(denom))
+    valid = (t > 0) & (in_bounds | is_infinite) & (~is_parallel)
     
-    # We only care about forward intersections (t > 0)
-    t = jnp.where(is_parallel | (t < 0), jnp.inf, t)
-    
-    return t
+    return jnp.where(valid, t, jnp.inf)
 
 def ray_box_intersection(ray_origin, ray_dir, box_pos, box_rot, box_size):
     """
@@ -134,6 +156,12 @@ def ray_capsule_intersection(ray_origin, ray_dir, cap_pos, cap_rot, cap_size):
     ro = jnp.dot(cap_rot.T, ray_origin - cap_pos)
     rd = jnp.dot(cap_rot.T, ray_dir)
     
+    # Check inside
+    # Segment from (0,0,-hl) to (0,0,hl)
+    z_clamped = jnp.clip(ro[2], -half_length, half_length)
+    dist_sq = ro[0]**2 + ro[1]**2 + (ro[2] - z_clamped)**2
+    is_inside = dist_sq <= radius**2
+    
     # Capsule = Cylinder (Z-axis) + 2 Spheres
     
     # 1. Infinite Cylinder Intersection
@@ -157,17 +185,17 @@ def ray_capsule_intersection(ray_origin, ray_dir, cap_pos, cap_rot, cap_size):
     valid_cyl = (delta >= 0) & (a > 1e-6)
     sqrt_delta = jnp.sqrt(jnp.maximum(0.0, delta))
     t1 = (-b - sqrt_delta) / (2*a + 1e-10)
-    t2 = (-b + sqrt_delta) / (2*a + 1e-10)
+    # t2 = (-b + sqrt_delta) / (2*a + 1e-10)
     
     # Check z bounds for cylinder hits
     z1 = ro[2] + t1 * rd[2]
-    z2 = ro[2] + t2 * rd[2]
+    # z2 = ro[2] + t2 * rd[2]
     
     in_bounds1 = jnp.abs(z1) <= half_length
-    in_bounds2 = jnp.abs(z2) <= half_length
+    # in_bounds2 = jnp.abs(z2) <= half_length
     
-    t_cyl_cand = jnp.where(in_bounds1 & (t1 > 0), t1, jnp.where(in_bounds2 & (t2 > 0), t2, jnp.inf))
-    t_cyl = jnp.where(valid_cyl, t_cyl_cand, jnp.inf)
+    # t_cyl_cand = jnp.where(in_bounds1 & (t1 > 0), t1, jnp.where(in_bounds2 & (t2 > 0), t2, jnp.inf))
+    t_cyl = jnp.where(valid_cyl & in_bounds1 & (t1 > 0), t1, jnp.inf)
     
     # 2. Sphere Caps Intersections
     # Top sphere: center (0, 0, half_length), radius
@@ -181,14 +209,16 @@ def ray_capsule_intersection(ray_origin, ray_dir, cap_pos, cap_rot, cap_size):
         
         sqrt_d_s = jnp.sqrt(jnp.maximum(0.0, delta_s))
         t1_s = -b_s - sqrt_d_s
-        t2_s = -b_s + sqrt_d_s
+        # t2_s = -b_s + sqrt_d_s
         
-        return jnp.where((delta_s >= 0) & (t1_s > 0), t1_s, jnp.where((delta_s >= 0) & (t2_s > 0), t2_s, jnp.inf))
+        return jnp.where((delta_s >= 0) & (t1_s > 0), t1_s, jnp.inf)
 
     t_top = intersect_local_sphere(jnp.array([0.0, 0.0, half_length]))
     t_bottom = intersect_local_sphere(jnp.array([0.0, 0.0, -half_length]))
     
-    return jnp.minimum(t_cyl, jnp.minimum(t_top, t_bottom))
+    t_final = jnp.minimum(t_cyl, jnp.minimum(t_top, t_bottom))
+    
+    return jnp.where(is_inside, 0.0, t_final)
 
 def ray_cylinder_intersection(ray_origin, ray_dir, cyl_pos, cyl_rot, cyl_size):
     """
@@ -200,6 +230,11 @@ def ray_cylinder_intersection(ray_origin, ray_dir, cyl_pos, cyl_rot, cyl_size):
     # Transform to local space
     ro = jnp.dot(cyl_rot.T, ray_origin - cyl_pos)
     rd = jnp.dot(cyl_rot.T, ray_dir)
+    
+    # Check inside
+    inside_xy = (ro[0]**2 + ro[1]**2) <= radius**2
+    inside_z = jnp.abs(ro[2]) <= half_length
+    is_inside = inside_xy & inside_z
     
     # 1. Infinite Cylinder
     ro_xy = ro[:2]
@@ -240,4 +275,6 @@ def ray_cylinder_intersection(ray_origin, ray_dir, cyl_pos, cyl_rot, cyl_size):
         jnp.where(valid_bot, t_bot, jnp.inf)
     )
     
-    return jnp.minimum(t_cyl, t_caps)
+    t_final = jnp.minimum(t_cyl, t_caps)
+    
+    return jnp.where(is_inside, 0.0, t_final)

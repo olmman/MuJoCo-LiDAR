@@ -125,17 +125,15 @@ class MjLidarJax:
         if self.plane_ids.shape[0] > 0:
             pos = geom_xpos[self.plane_ids]
             rot = geom_xmat[self.plane_ids].reshape(-1, 3, 3)
-            # Plane normal is local Z axis (0,0,1) rotated by rot
-            # normal = rot @ [0,0,1] = rot[:, 2]
-            normals = rot[:, :, 2]
+            size = self.geom_sizes[self.plane_ids]
             
-            def dist_all_rays_all_planes(ro, rd, pos, normal):
-                def dist_rays(p, n):
-                    return jax.vmap(lambda d: ray_plane_intersection(ro, d, p, n))(rd)
-                dists = jax.vmap(dist_rays)(pos, normals)
+            def dist_all_rays_all_planes(ro, rd, pos, rot, size):
+                def dist_rays(p, R, s):
+                    return jax.vmap(lambda d: ray_plane_intersection(ro, d, p, R, s))(rd)
+                dists = jax.vmap(dist_rays)(pos, rot, size)
                 return jnp.min(dists, axis=0)
             
-            d_planes = dist_all_rays_all_planes(rays_origin, rays_direction, pos, normals)
+            d_planes = dist_all_rays_all_planes(rays_origin, rays_direction, pos, rot, size)
             min_dist = jnp.minimum(min_dist, d_planes)
 
         # Replace inf with 0.0 (no hit)

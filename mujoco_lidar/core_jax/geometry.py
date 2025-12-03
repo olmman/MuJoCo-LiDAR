@@ -278,3 +278,41 @@ def ray_cylinder_intersection(ray_origin, ray_dir, cyl_pos, cyl_rot, cyl_size):
     t_final = jnp.minimum(t_cyl, t_caps)
     
     return jnp.where(is_inside, 0.0, t_final)
+
+def ray_ellipsoid_intersection(ray_origin, ray_dir, ell_pos, ell_rot, ell_size):
+    """
+    Ray-Ellipsoid intersection.
+    """
+    # Transform to local space
+    ro = jnp.dot(ell_rot.T, ray_origin - ell_pos)
+    rd = jnp.dot(ell_rot.T, ray_dir)
+    
+    # Scale to unit sphere space
+    # ell_size is (rx, ry, rz)
+    inv_size = 1.0 / (ell_size + 1e-10)
+    
+    ro_scaled = ro * inv_size
+    rd_scaled = rd * inv_size
+    
+    # Intersection with unit sphere
+    a = jnp.dot(rd_scaled, rd_scaled)
+    b = 2.0 * jnp.dot(ro_scaled, rd_scaled)
+    c = jnp.dot(ro_scaled, ro_scaled) - 1.0
+    
+    delta = b*b - 4*a*c
+    
+    # Check inside (c <= 0 means inside unit sphere)
+    is_inside = c <= 0
+    
+    sqrt_delta = jnp.sqrt(jnp.maximum(0.0, delta))
+    t1 = (-b - sqrt_delta) / (2*a + 1e-10)
+    # t2 = (-b + sqrt_delta) / (2*a + 1e-10)
+    
+    t = jnp.where(t1 > 0, t1, jnp.inf)
+    
+    # If inside, return 0.0
+    t = jnp.where(is_inside, 0.0, t)
+    
+    t = jnp.where(delta < 0, jnp.inf, t)
+    
+    return t

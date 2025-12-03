@@ -9,7 +9,8 @@ from .geometry import (
     ray_box_intersection,
     ray_capsule_intersection,
     ray_cylinder_intersection,
-    ray_plane_intersection
+    ray_plane_intersection,
+    ray_ellipsoid_intersection
 )
 
 class MjLidarJax:
@@ -34,6 +35,7 @@ class MjLidarJax:
         self.capsule_ids = self.geom_ids[self.selected_types == mjtGeom.mjGEOM_CAPSULE]
         self.cylinder_ids = self.geom_ids[self.selected_types == mjtGeom.mjGEOM_CYLINDER]
         self.plane_ids = self.geom_ids[self.selected_types == mjtGeom.mjGEOM_PLANE]
+        self.ellipsoid_ids = self.geom_ids[self.selected_types == mjtGeom.mjGEOM_ELLIPSOID]
         
         # Convert to jnp arrays for JIT
         self.sphere_ids = jnp.array(self.sphere_ids)
@@ -41,6 +43,7 @@ class MjLidarJax:
         self.capsule_ids = jnp.array(self.capsule_ids)
         self.cylinder_ids = jnp.array(self.cylinder_ids)
         self.plane_ids = jnp.array(self.plane_ids)
+        self.ellipsoid_ids = jnp.array(self.ellipsoid_ids)
         
         # Store sizes (static)
         self.geom_sizes = jnp.array(model.geom_size)
@@ -135,6 +138,21 @@ class MjLidarJax:
             
             d_planes = dist_all_rays_all_planes(rays_origin, rays_direction, pos, rot, size)
             min_dist = jnp.minimum(min_dist, d_planes)
+
+        # 6. Ellipsoids
+        if self.ellipsoid_ids.shape[0] > 0:
+            pos = geom_xpos[self.ellipsoid_ids]
+            rot = geom_xmat[self.ellipsoid_ids].reshape(-1, 3, 3)
+            size = self.geom_sizes[self.ellipsoid_ids]
+            
+            def dist_all_rays_all_ellipsoids(ro, rd, pos, rot, size):
+                def dist_rays(p, R, s):
+                    return jax.vmap(lambda d: ray_ellipsoid_intersection(ro, d, p, R, s))(rd)
+                dists = jax.vmap(dist_rays)(pos, rot, size)
+                return jnp.min(dists, axis=0)
+            
+            d_ellipsoids = dist_all_rays_all_ellipsoids(rays_origin, rays_direction, pos, rot, size)
+            min_dist = jnp.minimum(min_dist, d_ellipsoids)
 
         # Replace inf with 0.0 (no hit)
         return jnp.where(jnp.isinf(min_dist), 0.0, min_dist)

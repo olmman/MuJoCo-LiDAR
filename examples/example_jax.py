@@ -1,11 +1,12 @@
 import time
 import mujoco
 import numpy as np
+from etils import epath
 from mujoco_lidar import MjLidarWrapper, scan_gen
 
 # Load model
-model_path = "models/scene_jax.xml"
-mj_model = mujoco.MjModel.from_xml_path(model_path)
+mjcf_file = epath.Path(__file__).parent.parent / "models" / "scene_jax.xml"
+mj_model = mujoco.MjModel.from_xml_path(mjcf_file.as_posix())
 mj_data = mujoco.MjData(mj_model)
 
 # Initialize LiDAR with JAX backend

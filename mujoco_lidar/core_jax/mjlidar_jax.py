@@ -230,5 +230,48 @@ class MjLidarJax:
         Returns:
             distances: (B, Nrays)
         """
+        # Optimization: Reshape rotation matrices once if needed
+        if geom_xmat.ndim == 3 and geom_xmat.shape[-1] == 9:
+            geom_xmat = geom_xmat.reshape(geom_xmat.shape[0], -1, 3, 3)
+
         return jax.vmap(self.render)(geom_xpos, geom_xmat, rays_origin, rays_direction)
 
+    @partial(jax.jit, static_argnums=(0,))
+    def trace_rays_batch(self, geom_xpos: jax.Array, geom_xmat: jax.Array, sensor_pos: jax.Array, sensor_mat: jax.Array, ray_theta: jax.Array, ray_phi: jax.Array) -> Tuple[jax.Array, jax.Array]:
+        """
+        Full ray tracing pipeline for a batch of environments: ray generation, transformation, and rendering.
+
+        Args:
+            geom_xpos: (B, Ngeom, 3) Geometry positions
+            geom_xmat: (B, Ngeom, 9) or (B, Ngeom, 3, 3) Geometry rotation matrices
+            sensor_pos: (B, 3) World position of sensor per env
+            sensor_mat: (B, 3, 3) World rotation matrix of sensor per env
+            ray_theta: (Nrays,) Ray horizontal angles
+            ray_phi: (Nrays,) Ray vertical angles
+        """
+        # Optimization: Reshape rotation matrices once if needed
+        if geom_xmat.ndim == 3 and geom_xmat.shape[-1] == 9:
+            geom_xmat = geom_xmat.reshape(geom_xmat.shape[0], -1, 3, 3)
+
+        # 1. Ray generation (local space) - Compute once for all envs
+        x = jnp.cos(ray_phi) * jnp.cos(ray_theta)
+        y = jnp.cos(ray_phi) * jnp.sin(ray_theta)
+        z = jnp.sin(ray_phi)
+        local_rays = jnp.stack([x, y, z], axis=-1)
+        
+        def trace_single_env(geom_xpos, geom_xmat, sensor_pos, sensor_mat):
+            # 2. Transform to world rays
+            world_rays = local_rays @ sensor_mat.T
+            
+            # 3. Render
+            distances = self.render(geom_xpos, geom_xmat, sensor_pos, world_rays)
+            
+            return distances
+        
+        distances = jax.vmap(trace_single_env)(geom_xpos, geom_xmat, sensor_pos, sensor_mat)
+        
+        # Broadcast local_rays to match batch size
+        batch_size = geom_xpos.shape[0]
+        local_rays_batch = jnp.broadcast_to(local_rays, (batch_size, *local_rays.shape))
+        
+        return distances, local_rays_batch

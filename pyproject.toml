@@ -34,8 +34,7 @@ taichi = [
 ]
 # JAX backend
 jax = [
-    "jax",
-    "jaxlib",
+    "jax[cuda12]",
 ]
 
 [project.urls]

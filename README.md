@@ -59,6 +59,9 @@ pip install -e ".[taichi]"
 
 # 3. Install JAX backend dependencies
 pip install -e ".[jax]"
+
+# Verify JAX installation
+python -c "import jax; print(jax.default_backend())"
 ```
 
 ## 📚 Usage Examples

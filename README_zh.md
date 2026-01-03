@@ -60,6 +60,9 @@ pip install -e ".[taichi]"
 
 # 3. 安装JAX后端依赖
 pip install -e ".[jax]"
+
+# 验证 JAX 安装
+python -c "import jax; print(jax.default_backend())"
 ```
 
 **注意**：

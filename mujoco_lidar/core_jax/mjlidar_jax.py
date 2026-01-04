@@ -12,7 +12,8 @@ from .geometry import (
     ray_capsule_intersection,
     ray_cylinder_intersection,
     ray_plane_intersection,
-    ray_ellipsoid_intersection
+    ray_ellipsoid_intersection,
+    ray_hfield_intersection
 )
 
 class MjLidarJax:
@@ -46,23 +47,78 @@ class MjLidarJax:
         self.selected_types = all_types[self.geom_ids]
         
         # Group indices by type
-        self.sphere_ids = self.geom_ids[self.selected_types == mjtGeom.mjGEOM_SPHERE]
-        self.box_ids = self.geom_ids[self.selected_types == mjtGeom.mjGEOM_BOX]
-        self.capsule_ids = self.geom_ids[self.selected_types == mjtGeom.mjGEOM_CAPSULE]
-        self.cylinder_ids = self.geom_ids[self.selected_types == mjtGeom.mjGEOM_CYLINDER]
+        # - PLANE (0): 平面
+        # - HFIELD (1): 高度场
+        # - SPHERE (2): 球体
+        # - CAPSULE (3): 胶囊体
+        # - ELLIPSOID (4): 椭球体
+        # - CYLINDER (5): 圆柱体
+        # - BOX (6): 长方体
         self.plane_ids = self.geom_ids[self.selected_types == mjtGeom.mjGEOM_PLANE]
+        self.hfield_ids = self.geom_ids[self.selected_types == mjtGeom.mjGEOM_HFIELD]
+        self.sphere_ids = self.geom_ids[self.selected_types == mjtGeom.mjGEOM_SPHERE]
+        self.capsule_ids = self.geom_ids[self.selected_types == mjtGeom.mjGEOM_CAPSULE]
         self.ellipsoid_ids = self.geom_ids[self.selected_types == mjtGeom.mjGEOM_ELLIPSOID]
-        
+        self.cylinder_ids = self.geom_ids[self.selected_types == mjtGeom.mjGEOM_CYLINDER]
+        self.box_ids = self.geom_ids[self.selected_types == mjtGeom.mjGEOM_BOX]
+
         # Convert to jnp arrays for JIT
-        self.sphere_ids = jnp.array(self.sphere_ids)
-        self.box_ids = jnp.array(self.box_ids)
-        self.capsule_ids = jnp.array(self.capsule_ids)
-        self.cylinder_ids = jnp.array(self.cylinder_ids)
         self.plane_ids = jnp.array(self.plane_ids)
+        self.hfield_ids = jnp.array(self.hfield_ids)
+        self.sphere_ids = jnp.array(self.sphere_ids)
+        self.capsule_ids = jnp.array(self.capsule_ids)
         self.ellipsoid_ids = jnp.array(self.ellipsoid_ids)
+        self.cylinder_ids = jnp.array(self.cylinder_ids)
+        self.box_ids = jnp.array(self.box_ids)
         
         # Store sizes (static)
         self.geom_sizes = jnp.array(model.geom_size)
+
+        # Extract hfield data
+        if self.hfield_ids.shape[0] > 0:
+            # We need to get the data for each hfield
+            # mj_model.hfield_data is flat
+            # mj_model.hfield_adr is index
+            # mj_model.hfield_nrow/ncol
+            
+            # We need to map geom_id -> hfield_id
+            # m.geom_dataid[geom_id] gives hfield_id
+            
+            hfield_geom_ids = np.array(self.hfield_ids) # These are geom indices
+            hfield_asset_ids = model.geom_dataid[hfield_geom_ids]
+            
+            # Get max dimensions
+            max_nrow = np.max(model.hfield_nrow[hfield_asset_ids])
+            max_ncol = np.max(model.hfield_ncol[hfield_asset_ids])
+            
+            n_hfields = len(hfield_geom_ids)
+            self.hfield_data = np.zeros((n_hfields, max_nrow, max_ncol), dtype=np.float32)
+            self.hfield_nrow = np.zeros(n_hfields, dtype=np.int32)
+            self.hfield_ncol = np.zeros(n_hfields, dtype=np.int32)
+            self.hfield_sizes = np.zeros((n_hfields, 4), dtype=np.float32)
+            
+            for i, hid in enumerate(hfield_asset_ids):
+                nrow = model.hfield_nrow[hid]
+                ncol = model.hfield_ncol[hid]
+                adr = model.hfield_adr[hid]
+                data = model.hfield_data[adr:adr+nrow*ncol].reshape(nrow, ncol)
+                
+                # Try Transpose
+                # self.hfield_data[i, :nrow, :ncol] = data
+                self.hfield_data[i, :nrow, :ncol] = data
+                self.hfield_nrow[i] = nrow
+                self.hfield_ncol[i] = ncol
+                self.hfield_sizes[i] = model.hfield_size[hid]
+                
+            self.hfield_data = jnp.array(self.hfield_data)
+            self.hfield_nrow = jnp.array(self.hfield_nrow)
+            self.hfield_ncol = jnp.array(self.hfield_ncol)
+            self.hfield_sizes = jnp.array(self.hfield_sizes)
+        else:
+            self.hfield_data = jnp.zeros((0, 0, 0))
+            self.hfield_nrow = jnp.zeros(0, dtype=jnp.int32)
+            self.hfield_ncol = jnp.zeros(0, dtype=jnp.int32)
+            self.hfield_sizes = jnp.zeros((0, 4), dtype=np.float32)
         
     @partial(jax.jit, static_argnums=(0,))
     def render(self, geom_xpos: jax.Array, geom_xmat: jax.Array, rays_origin: jax.Array, rays_direction: jax.Array) -> jax.Array:
@@ -191,6 +247,27 @@ class MjLidarJax:
             
             d_ellipsoids = dist_all_rays_all_ellipsoids(rays_origin, rays_direction, pos, rot, size)
             min_dist = jnp.minimum(min_dist, d_ellipsoids)
+
+        # 7. Hfields
+        if self.hfield_ids.shape[0] > 0:
+            pos = geom_xpos[self.hfield_ids]
+            rot = geom_xmat[self.hfield_ids]
+            size = self.hfield_sizes
+            data = self.hfield_data
+            nrows = self.hfield_nrow
+            ncols = self.hfield_ncol
+            
+            def dist_all_rays_all_hfields(ro, rd, pos, rot, size, data, nr, nc):
+                def scan_fn(carry, x):
+                    p, R, s, d, n_r, n_c = x
+                    dists = jax.vmap(lambda ray_d: ray_hfield_intersection(ro, ray_d, p, R, s, d, n_r, n_c))(rd)
+                    return jnp.minimum(carry, dists), None
+                
+                final_dist, _ = jax.lax.scan(scan_fn, jnp.full(rd.shape[0], jnp.inf), (pos, rot, size, data, nrows, ncols))
+                return final_dist
+            
+            d_hfields = dist_all_rays_all_hfields(rays_origin, rays_direction, pos, rot, size, data, nrows, ncols)
+            min_dist = jnp.minimum(min_dist, d_hfields)
 
         # Replace inf with 0.0 (no hit)
         distance = jnp.where(jnp.isinf(min_dist), 0.0, min_dist)

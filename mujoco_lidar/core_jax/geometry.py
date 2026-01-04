@@ -316,3 +316,209 @@ def ray_ellipsoid_intersection(ray_origin: jax.Array, ray_dir: jax.Array, ell_po
     t = jnp.where(delta < 0, jnp.inf, t)
     
     return t
+
+def ray_triangle_intersection(ray_origin: jax.Array, ray_dir: jax.Array, v0: jax.Array, v1: jax.Array, v2: jax.Array) -> jax.Array:
+    """
+    Ray-Triangle intersection using Moller-Trumbore algorithm.
+    """
+    epsilon = 1e-6
+    edge1 = v1 - v0
+    edge2 = v2 - v0
+    h = jnp.cross(ray_dir, edge2)
+    a = jnp.dot(edge1, h)
+    
+    # Parallel check
+    # if a > -epsilon and a < epsilon: return inf
+    
+    f = 1.0 / (a + 1e-10 * jnp.sign(a))
+    s = ray_origin - v0
+    u = f * jnp.dot(s, h)
+    
+    q = jnp.cross(s, edge1)
+    v = f * jnp.dot(ray_dir, q)
+    
+    t = f * jnp.dot(edge2, q)
+    
+    # Check validity
+    mask = (jnp.abs(a) > epsilon) & (u >= 0.0) & (u <= 1.0) & (v >= 0.0) & (u + v <= 1.0) & (t > epsilon)
+    
+    return jnp.where(mask, t, jnp.inf)
+
+def ray_hfield_intersection(ray_origin: jax.Array, ray_dir: jax.Array, hfield_pos: jax.Array, hfield_rot: jax.Array, hfield_size: jax.Array, hfield_data: jax.Array, hfield_nrow: int | jax.Array = None, hfield_ncol: int | jax.Array = None) -> jax.Array:
+    """
+    Ray-Heightfield intersection.
+    
+    Args:
+        ray_origin: (3,)
+        ray_dir: (3,)
+        hfield_pos: (3,)
+        hfield_rot: (3, 3)
+        hfield_size: (4,) (radius_x, radius_y, elevation_z, base_z)
+        hfield_data: (nrow, ncol) Normalized elevation data
+        hfield_nrow: int (optional)
+        hfield_ncol: int (optional)
+    """
+    rx, ry, ez, bz = hfield_size[0], hfield_size[1], hfield_size[2], hfield_size[3]
+    
+    if hfield_nrow is None:
+        nrow = hfield_data.shape[0]
+    else:
+        nrow = hfield_nrow
+        
+    if hfield_ncol is None:
+        ncol = hfield_data.shape[1]
+    else:
+        ncol = hfield_ncol
+    
+    # Transform to local space
+    ro = jnp.dot(hfield_rot.T, ray_origin - hfield_pos)
+    rd = jnp.dot(hfield_rot.T, ray_dir)
+    
+    # AABB Intersection
+    aabb_min = jnp.array([-rx, -ry, -bz])
+    aabb_max = jnp.array([rx, ry, ez])
+    
+    inv_rd = 1.0 / (rd + 1e-10 * jnp.sign(rd))
+    t1 = (aabb_min - ro) * inv_rd
+    t2 = (aabb_max - ro) * inv_rd
+    
+    t_min = jnp.minimum(t1, t2)
+    t_max = jnp.maximum(t1, t2)
+    
+    t_enter = jnp.max(t_min)
+    t_exit = jnp.min(t_max)
+    
+    hit_aabb = (t_enter <= t_exit) & (t_exit > 0)
+    
+    # If no hit, return inf
+    # We will mask the result at the end
+    
+    # Start point for traversal
+    t_start = jnp.maximum(0.0, t_enter)
+    p_start = ro + t_start * rd
+    
+    # Grid parameters
+    dx = 2 * rx / (ncol - 1)
+    dy = 2 * ry / (nrow - 1)
+    
+    # Check if we hit the "underground" part at entry
+    # Map p_start to grid
+    u_start = (p_start[0] + rx) / dx
+    v_start = (p_start[1] + ry) / dy
+    
+    ix_start = jnp.clip(jnp.floor(u_start).astype(jnp.int32), 0, ncol - 2)
+    iy_start = jnp.clip(jnp.floor(v_start).astype(jnp.int32), 0, nrow - 2)
+    
+    h_start = hfield_data[iy_start, ix_start] * ez
+    
+    # If p_start.z < h_start, we are hitting the side wall or base
+    # (Assuming we hit the AABB, so we are within XY bounds)
+    hit_underground = (p_start[2] < h_start)
+    
+    # Ray Marching Setup
+    # We use a DDA-like approach
+    
+    # Initial cell
+    ix = ix_start
+    iy = iy_start
+    
+    # Step direction
+    step_x = jnp.where(rd[0] >= 0, 1, -1)
+    step_y = jnp.where(rd[1] >= 0, 1, -1)
+    
+    # Distance to next boundary
+    # next_x_boundary = -rx + (ix + (1 if step_x > 0 else 0)) * dx
+    next_x_idx = ix + jnp.where(step_x > 0, 1, 0)
+    next_y_idx = iy + jnp.where(step_y > 0, 1, 0)
+    
+    next_x = -rx + next_x_idx * dx
+    next_y = -ry + next_y_idx * dy
+    
+    t_max_x = (next_x - ro[0]) / (rd[0] + 1e-10 * jnp.sign(rd[0]))
+    t_max_y = (next_y - ro[1]) / (rd[1] + 1e-10 * jnp.sign(rd[1]))
+    
+    t_delta_x = jnp.abs(dx / (rd[0] + 1e-10 * jnp.sign(rd[0])))
+    t_delta_y = jnp.abs(dy / (rd[1] + 1e-10 * jnp.sign(rd[1])))
+    
+    # Loop state: (t_curr, ix, iy, t_max_x, t_max_y, hit_found, t_hit)
+    init_val = (t_start, ix, iy, t_max_x, t_max_y, False, jnp.inf)
+    
+    def cond_fun(val):
+        t, ix, iy, _, _, hit, _ = val
+        # Continue if:
+        # 1. Not hit yet
+        # 2. t < t_exit
+        # 3. Indices within bounds (0 to ncol-2, 0 to nrow-2 for cells)
+        # Note: We need to check triangles in cell (ix, iy).
+        # Valid cell indices are 0..ncol-2 and 0..nrow-2.
+        # If ix == ncol-1, we are at the edge, maybe just exit?
+        in_bounds = (ix >= 0) & (ix < ncol - 1) & (iy >= 0) & (iy < nrow - 1)
+        return (~hit) & (t < t_exit + 1e-3) & in_bounds
+
+    def body_fun(val):
+        t_curr, ix, iy, t_mx, t_my, hit, t_h = val
+        
+        # Check intersection with triangles in current cell (ix, iy)
+        # Vertices
+        x0 = -rx + ix * dx
+        y0 = -ry + iy * dy
+        x1 = x0 + dx
+        y1 = y0 + dy
+        
+        h00 = hfield_data[iy, ix] * ez
+        h10 = hfield_data[iy, ix+1] * ez
+        h01 = hfield_data[iy+1, ix] * ez
+        h11 = hfield_data[iy+1, ix+1] * ez
+        
+        v00 = jnp.array([x0, y0, h00])
+        v10 = jnp.array([x1, y0, h10])
+        v01 = jnp.array([x0, y1, h01])
+        v11 = jnp.array([x1, y1, h11])
+        
+        # Triangle 1: v00, v10, v01
+        t_tri1 = ray_triangle_intersection(ro, rd, v00, v10, v01)
+        
+        # Triangle 2: v10, v11, v01
+        t_tri2 = ray_triangle_intersection(ro, rd, v10, v11, v01)
+        
+        t_cell = jnp.minimum(t_tri1, t_tri2)
+        
+        # If hit within this cell?
+        # ray_triangle_intersection returns inf if no hit.
+        # We should check if t_cell is reasonable (e.g. >= t_curr - epsilon)
+        # But ray_triangle checks if point is inside triangle.
+        
+        found = t_cell < jnp.inf
+        
+        # Update step
+        # If t_mx < t_my, step X
+        step_x_cond = t_mx < t_my
+        
+        next_t = jnp.minimum(t_mx, t_my)
+        next_ix = ix + jnp.where(step_x_cond, step_x, 0)
+        next_iy = iy + jnp.where(step_x_cond, 0, step_y)
+        next_t_mx = t_mx + jnp.where(step_x_cond, t_delta_x, 0)
+        next_t_my = t_my + jnp.where(step_x_cond, 0, t_delta_y)
+        
+        return (next_t, next_ix, next_iy, next_t_mx, next_t_my, found, t_cell)
+
+    # Only march if not hit underground at start
+    # And if we are not already outside (t_start > t_exit handled by cond)
+    
+    # We need to handle the case where we start "above" the terrain but inside AABB.
+    # If hit_underground is True, we return t_start.
+    # Else we march.
+    
+    final_val = jax.lax.while_loop(cond_fun, body_fun, init_val)
+    
+    _, _, _, _, _, hit_march, t_march = final_val
+    
+    # Result logic
+    # If hit_underground: t = t_start
+    # Else if hit_march: t = t_march
+    # Else: inf
+    
+    t_final = jnp.where(hit_underground, t_start, jnp.where(hit_march, t_march, jnp.inf))
+    
+    # Mask with AABB hit
+    return jnp.where(hit_aabb, t_final, jnp.inf)

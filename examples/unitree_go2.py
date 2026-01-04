@@ -14,6 +14,7 @@ from mujoco_lidar import MjLidarWrapper
 _HERE = epath.Path(__file__).parent
 _ONNX_DIR = _HERE / "onnx"
 _MJCF_PATH = _HERE.parent / "models" / "scene_go2.xml"
+# _MJCF_PATH = _HERE.parent / "models" / "scene_go2_stairs_terrain.xml"
 
 _JOINT_NUM = 12
 class OnnxController:
@@ -28,6 +29,7 @@ class OnnxController:
         action_scale: float = 0.5,
         lidar_type: str = "mid360",
         stand: bool = False,
+        backend: str = "taichi"
     ):
         self._output_names = ["continuous_actions"]
         self._policy = rt.InferenceSession(
@@ -56,7 +58,7 @@ class OnnxController:
 
         geomgroup = np.ones((mujoco.mjNGROUP,), dtype=np.ubyte)
         geomgroup[3:] = 0  # 排除group 1中的几何体
-        self.lidar = MjLidarWrapper(mj_model, site_name="lidar", backend="taichi", args={'bodyexclude': mj_model.body("base").id, "geomgroup":geomgroup})
+        self.lidar = MjLidarWrapper(mj_model, site_name="lidar", backend=backend, args={'bodyexclude': mj_model.body("base").id, "geomgroup":geomgroup})
 
     def get_obs(self, mj_model, mj_data) -> np.ndarray:
         linvel = mj_data.sensor("local_linvel").data
@@ -103,6 +105,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description='MuJoCo LiDAR可视化与Unitree Go2 ROS2集成')
     parser.add_argument('--lidar', type=str, default='mid360', help='LiDAR型号 (airy, mid360)', choices=['airy', 'mid360'])
     parser.add_argument('--stand', action='store_true', help='是否静止显示')
+    parser.add_argument('--backend', type=str, default='taichi', help='LiDAR后端 (cpu, taichi, jax)', choices=['cpu', 'taichi', 'jax'])
     args = parser.parse_args()
 
     mj_model = mujoco.MjModel.from_xml_path(
@@ -124,6 +127,7 @@ if __name__ == "__main__":
         action_scale=0.5,
         lidar_type=args.lidar,
         stand=args.stand,
+        backend=args.backend
     )
 
     with mujoco.viewer.launch_passive(

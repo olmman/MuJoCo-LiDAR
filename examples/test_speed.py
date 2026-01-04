@@ -5,6 +5,7 @@ from etils import epath
 import mujoco
 import numpy as np
 from mujoco_lidar import MjLidarWrapper, scan_gen
+import matplotlib.cm as cm
 
 np.set_printoptions(precision=3, suppress=True, linewidth=500)
 
@@ -42,7 +43,7 @@ for backend in backends:
         
         # Timing
         start = time.time()
-        num_runs = 10
+        num_runs = 1 #5
         for _ in range(num_runs):
             ranges = lidar.trace_rays(mj_data, theta, phi)
             if backend == 'jax':
@@ -79,23 +80,12 @@ for backend in backends:
             else:
                 z_norm = (z_vals - z_min) / z_range
             
-            # Map to RGB (Blue -> Green -> Red)
-            colors = np.zeros((len(z_vals), 3), dtype=np.uint8)
-            
-            # 0.0 - 0.5: Blue to Green
-            mask1 = z_norm < 0.5
-            t1 = z_norm[mask1] * 2
-            colors[mask1, 0] = 0
-            colors[mask1, 1] = (t1 * 255).astype(np.uint8)
-            colors[mask1, 2] = ((1 - t1) * 255).astype(np.uint8)
-            
-            # 0.5 - 1.0: Green to Red
-            mask2 = ~mask1
-            t2 = (z_norm[mask2] - 0.5) * 2
-            colors[mask2, 0] = (t2 * 255).astype(np.uint8)
-            colors[mask2, 1] = ((1 - t2) * 255).astype(np.uint8)
-            colors[mask2, 2] = 0
-            
+            # Map to RGB using matplotlib
+            if backend == 'cpu':
+                colors = (cm.jet(1. - z_norm)[:, :3] * 255).astype(np.uint8)
+            else:
+                colors = (cm.jet(z_norm)[:, :3] * 255).astype(np.uint8)
+
             # Combine points and colors
             vertex_data = np.hstack([valid_points, colors])
             

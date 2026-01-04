@@ -3,6 +3,8 @@
 from mujoco_lidar.lidar_wrapper import MjLidarWrapper
 from typing import Any
 
+__version__ = "0.2.3"
+
 __all__ = [
     "MjLidarWrapper",
     # Scan generation functions (imported lazily via __getattr__)

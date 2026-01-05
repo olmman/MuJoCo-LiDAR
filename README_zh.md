@@ -47,6 +47,34 @@
 
 ### 快速安装
 
+使用pip安装：
+
+```bash
+# 1. 安装基础依赖（CPU后端）
+pip install mujoco_lidar
+
+# 验证安装
+python -c "import mujoco_lidar; print(mujoco_lidar.__version__)"
+# 应该输出类似 "0.2.5" 的版本号
+
+# 2.(可选) 安装Taichi后端依赖
+pip install mujoco_lidar[taichi]
+
+# 验证 Taichi 安装
+python -c "import taichi as ti; ti.init(ti.gpu)"
+# 应该输出类似：
+# [Taichi] version 1.7.3, llvm 15.0.4, commit 5ec301be, linux, python 3.10.16
+# [Taichi] Starting on arch=cuda
+
+# 3.(可选) 安装JAX后端依赖
+pip install mujoco_lidar[jax]
+
+# 验证 JAX 安装
+python -c "import jax; print(jax.default_backend())"
+# 应该输出 "gpu"
+```
+
+从源码安装：
 ```bash
 # 克隆仓库
 git clone https://github.com/TATP-233/MuJoCo-LiDAR.git
@@ -55,10 +83,10 @@ cd MuJoCo-LiDAR
 # 1. 安装基础依赖（CPU后端）
 pip install -e .
 
-# 2. 安装Taichi后端依赖
+# 2.(可选) 安装Taichi后端依赖
 pip install -e ".[taichi]"
 
-# 3. 安装JAX后端依赖
+# 3.(可选) 安装JAX后端依赖
 pip install -e ".[jax]"
 
 # 验证 JAX 安装
@@ -69,7 +97,7 @@ python -c "import jax; print(jax.default_backend())"
 **注意**：
 - CPU后端不需要安装Taichi和TIBVH，开箱即用
 - Taichi后端需要配置好cuda的nvidia显卡或其他Taichi支持的GPU
-- 目前只有Jax后端支持batch环境
+- 目前只有Taichi和JAX后端支持batch环境
 
 ## 📚 使用示例
 

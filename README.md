@@ -46,6 +46,36 @@ A high-performance LiDAR simulation tool based on MuJoCo, supporting CPU, Taichi
 
 ### Quick Installation
 
+You can install MuJoCo-LiDAR via pip from PyPI:
+
+```bash
+# 1. Install basic dependencies (CPU backend)
+pip install mujoco-lidar
+
+# Verify installation
+python -c "import mujoco_lidar; print(mujoco_lidar.__version__)"
+# should print the installed version, e.g., "0.2.5"
+
+# 2.(Optional) Install Taichi backend dependencies
+pip install mujoco-lidar[taichi]
+
+# Verify Taichi installation
+python -c "import taichi as ti; ti.init(ti.gpu)"
+# should print something like:
+# [Taichi] version 1.7.3, llvm 15.0.4, commit 5ec301be, linux, python 3.10.16
+# [Taichi] Starting on arch=cuda
+
+# 3.(Optional) Install JAX backend dependencies
+pip install mujoco-lidar[jax]
+
+
+# Verify JAX installation
+python -c "import jax; print(jax.default_backend())"
+# should print "gpu"
+```
+
+From Source Code:
+
 ```bash
 # Clone the repository
 git clone https://github.com/TATP-233/MuJoCo-LiDAR.git
@@ -54,10 +84,16 @@ cd MuJoCo-LiDAR
 # 1. Install basic dependencies (CPU backend)
 pip install -e .
 
-# 2. Install Taichi backend dependencies
+# 2.(Optional) Install Taichi backend dependencies
 pip install -e ".[taichi]"
 
-# 3. Install JAX backend dependencies
+# Verify Taichi installation
+python -c "import taichi as ti; ti.init(ti.gpu)"
+# should print something like:
+# [Taichi] version 1.7.3, llvm 15.0.4, commit 5ec301be, linux, python 3.10.16
+# [Taichi] Starting on arch=cuda
+
+# 3.(Optional) Install JAX backend dependencies
 pip install -e ".[jax]"
 
 # Verify JAX installation
@@ -68,7 +104,7 @@ python -c "import jax; print(jax.default_backend())"
 **Notice**:
 - CPU backend does not require Taichi and TIBVH, works out-of-the-box.
 - Taichi backend requires a properly configured NVIDIA GPU with CUDA or other Taichi-supported GPUs.
-- Currently, only JAX backend supports batch environments.
+- Currently, only Taichi and JAX backend supports batch environments.
 
 ## 📚 Usage Examples
 

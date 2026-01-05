@@ -30,7 +30,7 @@ dependencies = [
 # Taichi backend with all dependencies (taichi, tibvh, and utilities)
 taichi = [
     "taichi >= 1.6.0",
-    "tibvh @ git+https://github.com/TATP-233/tibvh.git",
+    "tibvh >= 0.1.2",
 ]
 # JAX backend
 jax = [

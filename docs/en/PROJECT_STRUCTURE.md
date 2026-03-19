@@ -18,11 +18,18 @@ MuJoCo-LiDAR/
 │       └── baseline.json
 │
 ├── docs/                             # Documentation
-│   ├── API.md                        # API reference
-│   ├── INSTALLATION.md               # Installation guide
-│   ├── USAGE.md                      # Usage examples
-│   ├── DEVELOPMENT.md                # Development guide
-│   └── PROJECT_STRUCTURE.md          # This file
+│   ├── en/                           # English docs
+│   │   ├── API.md                    # API reference
+│   │   ├── INSTALLATION.md           # Installation guide
+│   │   ├── USAGE.md                  # Usage examples
+│   │   ├── DEVELOPMENT.md            # Development guide
+│   │   └── PROJECT_STRUCTURE.md      # This file
+│   └── zh_CN/                        # Chinese docs
+│       ├── API.md
+│       ├── INSTALLATION.md
+│       ├── USAGE.md
+│       ├── DEVELOPMENT.md
+│       └── PROJECT_STRUCTURE.md
 │
 ├── examples/                         # Usage examples
 │   ├── example_*.py                  # Basic examples
@@ -35,7 +42,7 @@ MuJoCo-LiDAR/
 │       ├── lidar_wrapper.py          # Main wrapper
 │       ├── scan_gen.py               # Scan pattern generators
 │       ├── core_cpu/                 # CPU backend
-│       ├── core_taichi/              # Taichi backend
+│       ├── core_ti/                  # Taichi backend
 │       └── core_jax/                 # JAX backend
 │
 ├── tests/                            # Test suite

@@ -16,7 +16,7 @@ High-performance LiDAR simulation for MuJoCo with CPU, Taichi, and JAX backends.
   <img src="./assets/lidar_rviz.png" width="33%" />
 </p>
 
-[中文文档](README_zh.md) | [Installation](docs/INSTALLATION.md) | [Usage Guide](docs/USAGE.md) | [Development](docs/DEVELOPMENT.md) | [Contributing](CONTRIBUTING.md)
+[中文文档](README_zh.md) | [Installation](docs/en/INSTALLATION.md) | [Usage Guide](docs/en/USAGE.md) | [Development](docs/en/DEVELOPMENT.md) | [Contributing](CONTRIBUTING.md)
 
 ## Features
 
@@ -43,7 +43,7 @@ uv add "mujoco-lidar[taichi]"
 uv add "mujoco-lidar[jax]"
 ```
 
-See [Installation Guide](docs/INSTALLATION.md) for details.
+See [Installation Guide](docs/en/INSTALLATION.md) for details.
 
 ### Basic Usage
 
@@ -70,7 +70,7 @@ theta, phi = scan_gen.generate_HDL64()
 ranges = lidar.trace_rays(data, theta, phi)
 ```
 
-See [Usage Guide](docs/USAGE.md) for more examples.
+See [Usage Guide](docs/en/USAGE.md) for more examples.
 
 ## Performance
 
@@ -84,11 +84,11 @@ Run benchmarks: `make benchmark`
 
 ## Documentation
 
-- [Installation Guide](docs/INSTALLATION.md) - Detailed installation instructions
-- [Usage Guide](docs/USAGE.md) - Examples and tutorials
-- [API Reference](docs/API.md) - Complete API documentation
-- [Development Guide](docs/DEVELOPMENT.md) - Contributing and testing
-- [Project Structure](docs/PROJECT_STRUCTURE.md) - Codebase organization
+- [Installation Guide](docs/en/INSTALLATION.md) - Detailed installation instructions
+- [Usage Guide](docs/en/USAGE.md) - Examples and tutorials
+- [API Reference](docs/en/API.md) - Complete API documentation
+- [Development Guide](docs/en/DEVELOPMENT.md) - Contributing and testing
+- [Project Structure](docs/en/PROJECT_STRUCTURE.md) - Codebase organization
 
 ## Examples
 

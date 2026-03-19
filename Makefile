@@ -1,7 +1,7 @@
 .PHONY: help install test test-cov lint format check benchmark clean
 
-# Use existing Python env to avoid rebuilding mujoco from source
-UV_RUN := UV_PROJECT_ENVIRONMENT=$(shell python -c "import sys; print(sys.prefix)") uv run --no-sync
+# Use python3.10 which has pre-built mujoco wheels
+UV_RUN := uv run --python python3.10
 
 help:
 	@echo "MuJoCo-LiDAR Development Commands"

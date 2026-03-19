@@ -1,4 +1,3 @@
-from typing import Optional
 
 import mujoco
 import numpy as np
@@ -9,7 +8,7 @@ class MjLidarCPU:
         self,
         mj_model: mujoco.MjModel,
         cutoff_dist: float = 100.0,
-        geomgroup: Optional[np.ndarray] = None,
+        geomgroup: np.ndarray | None = None,
         bodyexclude: int = -1,
     ) -> None:
 
@@ -18,8 +17,8 @@ class MjLidarCPU:
         self.geomgroup = geomgroup
         self.bodyexclude = bodyexclude
 
-        self._dist: Optional[np.ndarray] = None
-        self._hit_points: Optional[np.ndarray] = None
+        self._dist: np.ndarray | None = None
+        self._hit_points: np.ndarray | None = None
 
     def update(self, mj_data: mujoco.MjData) -> None:
         self.mj_data = mj_data
@@ -58,6 +57,7 @@ class MjLidarCPU:
             bodyexclude=self.bodyexclude,
             geomid=_geomid,
             dist=self._dist,
+            normal=None,
             nray=_nray,
             cutoff=self.cutoff_dist,
         )
@@ -67,8 +67,8 @@ class MjLidarCPU:
         # Update the pcl frame with local frame data
         self._hit_points = local_vecs * self._dist[:, np.newaxis]
 
-    def get_hit_points(self) -> Optional[np.ndarray]:
+    def get_hit_points(self) -> np.ndarray | None:
         return self._hit_points
 
-    def get_distances(self) -> Optional[np.ndarray]:
+    def get_distances(self) -> np.ndarray | None:
         return self._dist

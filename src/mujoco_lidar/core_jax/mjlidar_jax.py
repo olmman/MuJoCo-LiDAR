@@ -1,5 +1,4 @@
 from functools import partial
-from typing import Optional, Union
 
 import jax
 import jax.numpy as jnp
@@ -22,8 +21,8 @@ class MjLidarJax:
     def __init__(
         self,
         model: mujoco.MjModel,
-        geom_ids: Optional[Union[np.ndarray, list]] = None,
-        geomgroup: Optional[Union[np.ndarray, list]] = None,
+        geom_ids: np.ndarray | list | None = None,
+        geomgroup: np.ndarray | list | None = None,
         bodyexclude: int = -1,
     ):
         self.model = model

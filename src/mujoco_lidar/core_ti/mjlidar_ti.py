@@ -1,4 +1,3 @@
-from typing import Optional
 
 import mujoco
 import numpy as np
@@ -22,7 +21,7 @@ class MjLidarTi:
         self,
         mj_model: mujoco.MjModel,
         cutoff_dist: float = 100.0,
-        geomgroup: Optional[np.ndarray] = None,
+        geomgroup: np.ndarray | None = None,
         bodyexclude: int = -1,
         max_candidates: int = 32,
     ):

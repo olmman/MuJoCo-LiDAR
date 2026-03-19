@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 
 import mujoco
 import numpy as np
@@ -94,8 +94,8 @@ class MjLidarWrapper:
 
         self.site_name = site_name
         self._sensor_pose = np.eye(4, dtype=np.float32)
-        self._local_rays: Optional[np.ndarray] = None
-        self._distances: Optional[np.ndarray] = None
+        self._local_rays: np.ndarray | None = None
+        self._distances: np.ndarray | None = None
 
     def _init_taichi_backend(self) -> None:
         """Initialize Taichi backend"""
@@ -183,7 +183,7 @@ class MjLidarWrapper:
         mj_data: mujoco.MjData,
         ray_theta: np.ndarray,
         ray_phi: np.ndarray,
-        site_name: Optional[str] = None,
+        site_name: str | None = None,
     ) -> np.ndarray:
         """
         Trace rays.

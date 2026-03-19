@@ -13,7 +13,7 @@
 - No abstractions for single-use cases
 - No error handling for internal code paths
 
-Performance matters: this is GPU-intensive research code.
+Performance matters: this is GPU-intensive research code. Prefer testability over debuggability.
 
 ## Git
 

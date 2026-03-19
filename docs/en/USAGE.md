@@ -149,4 +149,63 @@ lidar = MjLidarWrapper(
 )
 ```
 
-See [examples/](../examples/) for complete examples including ROS integration.
+---
+
+## Running Examples
+
+### Basic Examples
+
+```bash
+# CPU backend (no GPU required)
+uv run python examples/example_native.py
+
+# Taichi backend
+uv run python examples/example_taichi.py
+```
+
+### Unitree Go2
+
+Requires: Taichi backend, `onnxruntime`, `etils`
+
+```bash
+uv add "mujoco-lidar[taichi]" onnxruntime etils
+
+# Default (Livox mid360, Taichi backend)
+uv run python examples/unitree_go2.py
+
+# With Airy-96 LiDAR
+uv run python examples/unitree_go2.py --lidar airy
+
+# CPU backend (slower)
+uv run python examples/unitree_go2.py --backend cpu
+
+# Static pose (no walking)
+uv run python examples/unitree_go2.py --stand
+```
+
+### Unitree G1
+
+Requires: Taichi backend, `onnxruntime`, `etils`
+
+```bash
+uv add "mujoco-lidar[taichi]" onnxruntime etils
+
+# Default (Livox mid360)
+uv run python examples/unitree_g1.py
+
+# With Airy-96 LiDAR
+uv run python examples/unitree_g1.py --lidar airy
+```
+
+### ROS2 Integration
+
+```bash
+# Visualize point cloud in RViz2
+uv run python examples/lidar_vis_ros2.py
+
+# Go2 with ROS2
+uv run python examples/unitree_go2_ros2.py
+
+# G1 with ROS2
+uv run python examples/unitree_g1_ros2.py
+```

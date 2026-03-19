@@ -168,4 +168,67 @@ valid_mask = ranges > 0
 valid_points = hit_points[valid_mask]
 ```
 
-完整示例请参考 [examples/](../../examples/) 目录。
+    }
+)
+```
+
+---
+
+## 运行示例
+
+### 基础示例
+
+```bash
+# CPU 后端（无需 GPU）
+uv run python examples/example_native.py
+
+# Taichi 后端
+uv run python examples/example_taichi.py
+```
+
+### Unitree Go2
+
+依赖：Taichi 后端、`onnxruntime`、`etils`
+
+```bash
+uv add "mujoco-lidar[taichi]" onnxruntime etils
+
+# 默认（Livox mid360，Taichi 后端）
+uv run python examples/unitree_go2.py
+
+# 使用 Airy-96 LiDAR
+uv run python examples/unitree_go2.py --lidar airy
+
+# CPU 后端（较慢）
+uv run python examples/unitree_go2.py --backend cpu
+
+# 静止姿态（不行走）
+uv run python examples/unitree_go2.py --stand
+```
+
+### Unitree G1
+
+依赖：Taichi 后端、`onnxruntime`、`etils`
+
+```bash
+uv add "mujoco-lidar[taichi]" onnxruntime etils
+
+# 默认（Livox mid360）
+uv run python examples/unitree_g1.py
+
+# 使用 Airy-96 LiDAR
+uv run python examples/unitree_g1.py --lidar airy
+```
+
+### ROS2 集成
+
+```bash
+# 在 RViz2 中可视化点云
+uv run python examples/lidar_vis_ros2.py
+
+# Go2 + ROS2
+uv run python examples/unitree_go2_ros2.py
+
+# G1 + ROS2
+uv run python examples/unitree_g1_ros2.py
+```

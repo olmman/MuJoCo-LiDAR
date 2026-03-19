@@ -1,6 +1,5 @@
 # MuJoCo-LiDAR: High-Performance LiDAR Simulation
 
-[![CI](https://github.com/TATP-233/MuJoCo-LiDAR/actions/workflows/ci.yml/badge.svg)](https://github.com/TATP-233/MuJoCo-LiDAR/actions/workflows/ci.yml)
 [![PyPI](https://img.shields.io/pypi/v/mujoco-lidar)](https://pypi.org/project/mujoco-lidar/)
 [![Python](https://img.shields.io/pypi/pyversions/mujoco-lidar)](https://pypi.org/project/mujoco-lidar/)
 
@@ -32,6 +31,8 @@ High-performance LiDAR simulation for MuJoCo with CPU, Taichi, and JAX backends.
 
 ### Installation
 
+**From PyPI:**
+
 ```bash
 # Basic (CPU only)
 uv add mujoco-lidar
@@ -41,6 +42,14 @@ uv add "mujoco-lidar[taichi]"
 
 # With JAX backend (GPU + batch)
 uv add "mujoco-lidar[jax]"
+```
+
+**From Source:**
+
+```bash
+git clone https://github.com/TATP-233/MuJoCo-LiDAR.git
+cd MuJoCo-LiDAR
+uv sync --extra dev
 ```
 
 See [Installation Guide](docs/en/INSTALLATION.md) for details.

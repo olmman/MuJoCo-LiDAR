@@ -1,5 +1,8 @@
 .PHONY: help install test test-cov lint format check benchmark clean
 
+# Use existing Python env to avoid rebuilding mujoco from source
+UV_RUN := UV_PROJECT_ENVIRONMENT=$(shell python -c "import sys; print(sys.prefix)") uv run --no-sync
+
 help:
 	@echo "MuJoCo-LiDAR Development Commands"
 	@echo ""
@@ -16,22 +19,22 @@ install:
 	uv sync --extra dev
 
 test:
-	uv run pytest tests/ -v
+	$(UV_RUN) pytest tests/ -v
 
 test-cov:
-	uv run pytest tests/ -v --cov=mujoco_lidar --cov-report=html --cov-report=term
+	$(UV_RUN) pytest tests/ -v --cov=mujoco_lidar --cov-report=html --cov-report=term
 
 lint:
-	uv run ruff check .
+	$(UV_RUN) ruff check .
 
 format:
-	uv run ruff format .
-	uv run ruff check --fix .
+	$(UV_RUN) ruff format .
+	$(UV_RUN) ruff check --fix .
 
 check: lint test
 
 benchmark:
-	uv run python benchmarks/benchmark_core.py
+	$(UV_RUN) python benchmarks/benchmark_core.py
 
 clean:
 	rm -rf dist/ build/ *.egg-info .pytest_cache .ruff_cache htmlcov/ .venv/

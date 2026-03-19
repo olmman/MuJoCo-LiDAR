@@ -16,23 +16,17 @@
 ### From PyPI
 
 ```bash
-# 1. Install basic dependencies (CPU backend)
-pip install mujoco-lidar
+# Basic (CPU backend)
+uv add mujoco-lidar
 
-# Verify installation
-python -c "import mujoco_lidar; print(mujoco_lidar.__version__)"
+# Verify
+uv run python -c "import mujoco_lidar; print(mujoco_lidar.__version__)"
 
-# 2. (Optional) Install Taichi backend
-pip install mujoco-lidar[taichi]
+# With Taichi backend
+uv add "mujoco-lidar[taichi]"
 
-# Verify Taichi
-python -c "import taichi as ti; ti.init(ti.gpu)"
-
-# 3. (Optional) Install JAX backend
-pip install mujoco-lidar[jax]
-
-# Verify JAX
-python -c "import jax; print(jax.default_backend())"
+# With JAX backend
+uv add "mujoco-lidar[jax]"
 ```
 
 ### From Source
@@ -41,17 +35,11 @@ python -c "import jax; print(jax.default_backend())"
 git clone https://github.com/TATP-233/MuJoCo-LiDAR.git
 cd MuJoCo-LiDAR
 
-# Basic installation
-pip install -e .
-
-# With Taichi
-pip install -e ".[taichi]"
-
-# With JAX
-pip install -e ".[jax]"
-
-# Development
+# Install with dev dependencies
 uv sync --extra dev
+
+# Run tests
+uv run pytest tests/
 ```
 
 ## Backend Notes

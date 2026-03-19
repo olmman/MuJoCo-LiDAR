@@ -1,6 +1,6 @@
 # Lazy import to avoid loading taichi when not needed
 # These modules should only be imported when Taichi backend is explicitly requested
-from typing import Any, List, Optional, Set, Tuple
+from typing import Any
 
 __all__ = [
     "mjlidar_ti",

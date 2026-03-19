@@ -418,15 +418,9 @@ def ray_hfield_intersection(
     """
     rx, ry, ez, bz = hfield_size[0], hfield_size[1], hfield_size[2], hfield_size[3]
 
-    if hfield_nrow is None:
-        nrow = hfield_data.shape[0]
-    else:
-        nrow = hfield_nrow
+    nrow = hfield_data.shape[0] if hfield_nrow is None else hfield_nrow
 
-    if hfield_ncol is None:
-        ncol = hfield_data.shape[1]
-    else:
-        ncol = hfield_ncol
+    ncol = hfield_data.shape[1] if hfield_ncol is None else hfield_ncol
 
     # Transform to local space
     ro = jnp.dot(hfield_rot.T, ray_origin - hfield_pos)

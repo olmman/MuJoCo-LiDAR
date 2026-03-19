@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 import mujoco
 import numpy as np
@@ -70,8 +70,10 @@ class MjLidarWrapper:
         site_name: str,
         backend: str = "taichi",
         cutoff_dist: float = 100.0,
-        args: Dict[str, Any] = {},
+        args: dict[str, Any] = None,
     ):
+        if args is None:
+            args = {}
         if backend == "gpu":
             backend = "taichi"
         self.backend = backend
@@ -124,7 +126,7 @@ class MjLidarWrapper:
                 f"Failed to import Taichi backend dependencies. "
                 f"Please install taichi: pip install taichi\n"
                 f"Error: {e}"
-            )
+            ) from e
 
     def _init_jax_backend(self) -> None:
         """Initialize JAX backend"""
@@ -143,7 +145,7 @@ class MjLidarWrapper:
             )
 
         except ImportError as e:
-            raise ImportError(f"Failed to import JAX backend dependencies.\nError: {e}")
+            raise ImportError(f"Failed to import JAX backend dependencies.\nError: {e}") from e
 
     def _init_cpu_backend(self) -> None:
         """Initialize CPU backend"""
@@ -160,7 +162,7 @@ class MjLidarWrapper:
             )
 
         except ImportError as e:
-            raise ImportError(f"Failed to import CPU backend dependencies.\nError: {e}")
+            raise ImportError(f"Failed to import CPU backend dependencies.\nError: {e}") from e
 
     @property
     def sensor_position(self) -> np.ndarray:

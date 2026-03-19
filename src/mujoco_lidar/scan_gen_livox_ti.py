@@ -5,7 +5,6 @@ Livox LiDAR 扫描模式生成器
 """
 
 import os
-from typing import Tuple
 
 import numpy as np
 
@@ -116,7 +115,7 @@ class LivoxGeneratorTi:
 
     def sample_ray_angles_ti(
         self, downsample: int = 1
-    ) -> Tuple[ti.types.ndarray, ti.types.ndarray]:
+    ) -> tuple[ti.types.ndarray, ti.types.ndarray]:
         if downsample < 1:
             downsample = 1
         eff = self.samples // downsample if downsample > 1 else self.samples
@@ -129,6 +128,6 @@ class LivoxGeneratorTi:
         return self._theta_sample, self._phi_sample
 
     # 兼容旧接口（需要时仍可得到 numpy，但会有拷贝）
-    def sample_ray_angles(self, downsample: int = 1) -> Tuple[np.ndarray, np.ndarray]:
+    def sample_ray_angles(self, downsample: int = 1) -> tuple[np.ndarray, np.ndarray]:
         th_ti, ph_ti = self.sample_ray_angles_ti(downsample)
         return th_ti.to_numpy(), ph_ti.to_numpy()

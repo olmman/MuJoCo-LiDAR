@@ -34,13 +34,13 @@ High-performance LiDAR simulation for MuJoCo with CPU, Taichi, and JAX backends.
 
 ```bash
 # Basic (CPU only)
-pip install mujoco-lidar
+uv add mujoco-lidar
 
 # With Taichi backend (GPU)
-pip install mujoco-lidar[taichi]
+uv add "mujoco-lidar[taichi]"
 
 # With JAX backend (GPU + batch)
-pip install mujoco-lidar[jax]
+uv add "mujoco-lidar[jax]"
 ```
 
 See [Installation Guide](docs/INSTALLATION.md) for details.

@@ -1,6 +1,6 @@
 import os
 import sys
-from typing import Any, List, Set, Tuple
+from typing import Any
 
 import mujoco
 import numpy as np
@@ -8,7 +8,7 @@ from pynput import keyboard
 from scipy.spatial.transform import Rotation
 
 
-def create_demo_scene(scene: str = "primitive") -> Tuple[mujoco.MjModel, mujoco.MjData]:
+def create_demo_scene(scene: str = "primitive") -> tuple[mujoco.MjModel, mujoco.MjData]:
     """创建一个用于测试的mujoco场景，包含所有支持的几何体类型"""
     if scene == "floor":
         xml = """
@@ -162,7 +162,7 @@ class KeyboardListener:
         self.height_speed = 0.5  # 高度调整速度 (米/秒)
 
         # 当前按下的键
-        self.pressed_keys: Set[Any] = set()
+        self.pressed_keys: set[Any] = set()
 
         self.running = True
         # 启动键盘监听器
@@ -214,7 +214,7 @@ class KeyboardListener:
             # 忽略特殊键的AttributeError
             pass
 
-    def update_lidar_pose(self, dt: float) -> Tuple[np.ndarray, np.ndarray]:
+    def update_lidar_pose(self, dt: float) -> tuple[np.ndarray, np.ndarray]:
         """根据当前按下的键更新激光雷达的位置和姿态"""
         # 获取当前的欧拉角
         pitch = self.euler_angles[1]
@@ -278,7 +278,7 @@ if sys.platform == "linux":
 
         def create_marker_from_geom(
             geom: Any, marker_id: int, frame_id: str = "world"
-        ) -> List[Any]:
+        ) -> list[Any]:
             """从MuJoCo几何体创建ROS可视化标记"""
             # 胶囊体需要特殊处理，返回标记列表
             if geom.type == 3:  # CAPSULE
@@ -342,7 +342,7 @@ if sys.platform == "linux":
 
             return [marker]  # 返回单个标记的列表，保持接口一致
 
-        def create_capsule_markers(geom: Any, marker_id: int, frame_id: str = "world") -> List[Any]:
+        def create_capsule_markers(geom: Any, marker_id: int, frame_id: str = "world") -> list[Any]:
             """创建胶囊体的可视化标记（一个圆柱体和两个半球）"""
             markers = []
             radius = float(geom.size[0])  # 半径

@@ -1,5 +1,5 @@
 from functools import partial
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 
 import jax
 import jax.numpy as jnp
@@ -313,7 +313,7 @@ class MjLidarJax:
         sensor_mat: jax.Array,
         ray_theta: jax.Array,
         ray_phi: jax.Array,
-    ) -> Tuple[jax.Array, jax.Array]:
+    ) -> tuple[jax.Array, jax.Array]:
         """
         Full ray tracing pipeline: ray generation, transformation, and rendering.
         """
@@ -366,7 +366,7 @@ class MjLidarJax:
         sensor_mat: jax.Array,
         ray_theta: jax.Array,
         ray_phi: jax.Array,
-    ) -> Tuple[jax.Array, jax.Array]:
+    ) -> tuple[jax.Array, jax.Array]:
         """
         Full ray tracing pipeline for a batch of environments: ray generation, transformation, and rendering.
 

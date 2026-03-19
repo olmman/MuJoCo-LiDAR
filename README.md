@@ -76,9 +76,9 @@ See [Usage Guide](docs/en/USAGE.md) for more examples.
 
 | Backend | Rays/sec | Hardware | Batch Support |
 |---------|----------|----------|---------------|
-| CPU     | ~12M     | Native   | No            |
-| Taichi  | N/A      | GPU      | Yes           |
-| JAX     | N/A      | GPU      | Yes           |
+| CPU     | ~9M      | Native   | No            |
+| Taichi  | ~62M     | GPU      | Yes           |
+| JAX     | ~231M    | GPU      | Yes           |
 
 Run benchmarks: `make benchmark`
 

@@ -104,9 +104,9 @@ hit_points = lidar.get_hit_points()
 
 | 后端    | 射线速度      | 硬件要求 | 批量仿真 |
 |---------|--------------|----------|----------|
-| CPU     | ~12M rays/s  | 无需 GPU | 否       |
-| Taichi  | N/A（需 GPU）| NVIDIA GPU | 是     |
-| JAX     | N/A（需 GPU）| GPU      | 是       |
+| CPU     | ~9M rays/s   | 无需 GPU | 否       |
+| Taichi  | ~62M rays/s  | NVIDIA GPU | 是     |
+| JAX     | ~231M rays/s | GPU      | 是       |
 
 运行基准测试：`make benchmark`
 

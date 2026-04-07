@@ -24,8 +24,10 @@ class MjLidarJax:
         geom_ids: np.ndarray | list | None = None,
         geomgroup: np.ndarray | list | None = None,
         bodyexclude: int = -1,
+        max_distance: float | None = None,
     ):
         self.model = model
+        self.max_distance = None if max_distance is None else float(max_distance)
 
         # If geom_ids is None, use all geoms
         if geom_ids is None:
@@ -80,6 +82,11 @@ class MjLidarJax:
 
         # Store sizes (static)
         self.geom_sizes = jnp.array(model.geom_size)
+        self.sphere_bound_radii = jnp.array(model.geom_size[:, 0])
+        self.box_bound_radii = jnp.linalg.norm(self.geom_sizes[:, :3], axis=1)
+        self.capsule_bound_radii = self.geom_sizes[:, 0] + self.geom_sizes[:, 1]
+        self.cylinder_bound_radii = jnp.linalg.norm(self.geom_sizes[:, :2], axis=1)
+        self.ellipsoid_bound_radii = jnp.max(self.geom_sizes[:, :3], axis=1)
 
         # Extract hfield data
         if self.hfield_ids.shape[0] > 0:
@@ -127,6 +134,18 @@ class MjLidarJax:
             self.hfield_ncol = jnp.zeros(0, dtype=jnp.int32)
             self.hfield_sizes = jnp.zeros((0, 4), dtype=np.float32)
 
+    def _candidate_mask(
+        self,
+        sensor_pos: jax.Array,
+        geom_pos: jax.Array,
+        bound_radii: jax.Array,
+    ) -> jax.Array:
+        if self.max_distance is None:
+            return jnp.ones(geom_pos.shape[0], dtype=jnp.bool_)
+
+        center_dist = jnp.linalg.norm(geom_pos - sensor_pos[None, :], axis=1)
+        return center_dist <= (self.max_distance + bound_radii)
+
     @partial(jax.jit, static_argnums=(0,))
     def render(
         self,
@@ -158,17 +177,31 @@ class MjLidarJax:
         if self.sphere_ids.shape[0] > 0:
             pos = geom_xpos[self.sphere_ids]
             rad = self.geom_sizes[self.sphere_ids, 0]
+            active = self._candidate_mask(
+                rays_origin,
+                pos,
+                self.sphere_bound_radii[self.sphere_ids],
+            )
 
-            def dist_all_rays_all_spheres(ro, rd, pos, rad):
+            def dist_all_rays_all_spheres(ro, rd, pos, rad, active):
                 def scan_fn(carry, x):
-                    p, r = x
-                    dists = jax.vmap(lambda d: ray_sphere_intersection(ro, d, p, r))(rd)
+                    p, r, is_active = x
+                    dists = jax.lax.cond(
+                        is_active,
+                        lambda _: jax.vmap(lambda d: ray_sphere_intersection(ro, d, p, r))(rd),
+                        lambda _: jnp.full(rd.shape[0], jnp.inf),
+                        operand=None,
+                    )
                     return jnp.minimum(carry, dists), None
 
-                final_dist, _ = jax.lax.scan(scan_fn, jnp.full(rd.shape[0], jnp.inf), (pos, rad))
+                final_dist, _ = jax.lax.scan(
+                    scan_fn,
+                    jnp.full(rd.shape[0], jnp.inf),
+                    (pos, rad, active),
+                )
                 return final_dist
 
-            d_spheres = dist_all_rays_all_spheres(rays_origin, rays_direction, pos, rad)
+            d_spheres = dist_all_rays_all_spheres(rays_origin, rays_direction, pos, rad, active)
             min_dist = jnp.minimum(min_dist, d_spheres)
 
         # 2. Boxes
@@ -176,19 +209,29 @@ class MjLidarJax:
             pos = geom_xpos[self.box_ids]
             rot = geom_xmat[self.box_ids]
             size = self.geom_sizes[self.box_ids]
+            active = self._candidate_mask(
+                rays_origin,
+                pos,
+                self.box_bound_radii[self.box_ids],
+            )
 
-            def dist_all_rays_all_boxes(ro, rd, pos, rot, size):
+            def dist_all_rays_all_boxes(ro, rd, pos, rot, size, active):
                 def scan_fn(carry, x):
-                    p, R, s = x
-                    dists = jax.vmap(lambda d: ray_box_intersection(ro, d, p, R, s))(rd)
+                    p, R, s, is_active = x
+                    dists = jax.lax.cond(
+                        is_active,
+                        lambda _: jax.vmap(lambda d: ray_box_intersection(ro, d, p, R, s))(rd),
+                        lambda _: jnp.full(rd.shape[0], jnp.inf),
+                        operand=None,
+                    )
                     return jnp.minimum(carry, dists), None
 
                 final_dist, _ = jax.lax.scan(
-                    scan_fn, jnp.full(rd.shape[0], jnp.inf), (pos, rot, size)
+                    scan_fn, jnp.full(rd.shape[0], jnp.inf), (pos, rot, size, active)
                 )
                 return final_dist
 
-            d_boxes = dist_all_rays_all_boxes(rays_origin, rays_direction, pos, rot, size)
+            d_boxes = dist_all_rays_all_boxes(rays_origin, rays_direction, pos, rot, size, active)
             min_dist = jnp.minimum(min_dist, d_boxes)
 
         # 3. Capsules
@@ -196,19 +239,31 @@ class MjLidarJax:
             pos = geom_xpos[self.capsule_ids]
             rot = geom_xmat[self.capsule_ids]
             size = self.geom_sizes[self.capsule_ids]
+            active = self._candidate_mask(
+                rays_origin,
+                pos,
+                self.capsule_bound_radii[self.capsule_ids],
+            )
 
-            def dist_all_rays_all_capsules(ro, rd, pos, rot, size):
+            def dist_all_rays_all_capsules(ro, rd, pos, rot, size, active):
                 def scan_fn(carry, x):
-                    p, R, s = x
-                    dists = jax.vmap(lambda d: ray_capsule_intersection(ro, d, p, R, s))(rd)
+                    p, R, s, is_active = x
+                    dists = jax.lax.cond(
+                        is_active,
+                        lambda _: jax.vmap(lambda d: ray_capsule_intersection(ro, d, p, R, s))(rd),
+                        lambda _: jnp.full(rd.shape[0], jnp.inf),
+                        operand=None,
+                    )
                     return jnp.minimum(carry, dists), None
 
                 final_dist, _ = jax.lax.scan(
-                    scan_fn, jnp.full(rd.shape[0], jnp.inf), (pos, rot, size)
+                    scan_fn, jnp.full(rd.shape[0], jnp.inf), (pos, rot, size, active)
                 )
                 return final_dist
 
-            d_capsules = dist_all_rays_all_capsules(rays_origin, rays_direction, pos, rot, size)
+            d_capsules = dist_all_rays_all_capsules(
+                rays_origin, rays_direction, pos, rot, size, active
+            )
             min_dist = jnp.minimum(min_dist, d_capsules)
 
         # 4. Cylinders
@@ -216,19 +271,31 @@ class MjLidarJax:
             pos = geom_xpos[self.cylinder_ids]
             rot = geom_xmat[self.cylinder_ids]
             size = self.geom_sizes[self.cylinder_ids]
+            active = self._candidate_mask(
+                rays_origin,
+                pos,
+                self.cylinder_bound_radii[self.cylinder_ids],
+            )
 
-            def dist_all_rays_all_cylinders(ro, rd, pos, rot, size):
+            def dist_all_rays_all_cylinders(ro, rd, pos, rot, size, active):
                 def scan_fn(carry, x):
-                    p, R, s = x
-                    dists = jax.vmap(lambda d: ray_cylinder_intersection(ro, d, p, R, s))(rd)
+                    p, R, s, is_active = x
+                    dists = jax.lax.cond(
+                        is_active,
+                        lambda _: jax.vmap(lambda d: ray_cylinder_intersection(ro, d, p, R, s))(rd),
+                        lambda _: jnp.full(rd.shape[0], jnp.inf),
+                        operand=None,
+                    )
                     return jnp.minimum(carry, dists), None
 
                 final_dist, _ = jax.lax.scan(
-                    scan_fn, jnp.full(rd.shape[0], jnp.inf), (pos, rot, size)
+                    scan_fn, jnp.full(rd.shape[0], jnp.inf), (pos, rot, size, active)
                 )
                 return final_dist
 
-            d_cylinders = dist_all_rays_all_cylinders(rays_origin, rays_direction, pos, rot, size)
+            d_cylinders = dist_all_rays_all_cylinders(
+                rays_origin, rays_direction, pos, rot, size, active
+            )
             min_dist = jnp.minimum(min_dist, d_cylinders)
 
         # 5. Planes
@@ -256,19 +323,31 @@ class MjLidarJax:
             pos = geom_xpos[self.ellipsoid_ids]
             rot = geom_xmat[self.ellipsoid_ids]
             size = self.geom_sizes[self.ellipsoid_ids]
+            active = self._candidate_mask(
+                rays_origin,
+                pos,
+                self.ellipsoid_bound_radii[self.ellipsoid_ids],
+            )
 
-            def dist_all_rays_all_ellipsoids(ro, rd, pos, rot, size):
+            def dist_all_rays_all_ellipsoids(ro, rd, pos, rot, size, active):
                 def scan_fn(carry, x):
-                    p, R, s = x
-                    dists = jax.vmap(lambda d: ray_ellipsoid_intersection(ro, d, p, R, s))(rd)
+                    p, R, s, is_active = x
+                    dists = jax.lax.cond(
+                        is_active,
+                        lambda _: jax.vmap(lambda d: ray_ellipsoid_intersection(ro, d, p, R, s))(rd),
+                        lambda _: jnp.full(rd.shape[0], jnp.inf),
+                        operand=None,
+                    )
                     return jnp.minimum(carry, dists), None
 
                 final_dist, _ = jax.lax.scan(
-                    scan_fn, jnp.full(rd.shape[0], jnp.inf), (pos, rot, size)
+                    scan_fn, jnp.full(rd.shape[0], jnp.inf), (pos, rot, size, active)
                 )
                 return final_dist
 
-            d_ellipsoids = dist_all_rays_all_ellipsoids(rays_origin, rays_direction, pos, rot, size)
+            d_ellipsoids = dist_all_rays_all_ellipsoids(
+                rays_origin, rays_direction, pos, rot, size, active
+            )
             min_dist = jnp.minimum(min_dist, d_ellipsoids)
 
         # 7. Hfields
@@ -398,8 +477,6 @@ class MjLidarJax:
 
         distances = jax.vmap(trace_single_env)(geom_xpos, geom_xmat, sensor_pos, sensor_mat)
 
-        # Broadcast local_rays to match batch size
-        batch_size = geom_xpos.shape[0]
-        local_rays_batch = jnp.broadcast_to(local_rays, (batch_size, *local_rays.shape))
-
-        return distances, local_rays_batch
+        # Return a single shared local-ray template. The caller can broadcast it
+        # cheaply on its side if a batched view is needed.
+        return distances, local_rays

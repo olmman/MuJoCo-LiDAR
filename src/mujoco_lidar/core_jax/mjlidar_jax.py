@@ -137,14 +137,34 @@ class MjLidarJax:
     def _candidate_mask(
         self,
         sensor_pos: jax.Array,
+        sensor_rot: jax.Array,
         geom_pos: jax.Array,
         bound_radii: jax.Array,
     ) -> jax.Array:
         if self.max_distance is None:
             return jnp.ones(geom_pos.shape[0], dtype=jnp.bool_)
 
-        center_dist = jnp.linalg.norm(geom_pos - sensor_pos[None, :], axis=1)
-        return center_dist <= (self.max_distance + bound_radii)
+        rel_world = geom_pos - sensor_pos[None, :]
+        rel_local = rel_world @ sensor_rot
+        x_local = rel_local[:, 0]
+        y_local = rel_local[:, 1]
+        xy_dist = jnp.linalg.norm(rel_local[:, :2], axis=1)
+
+        abs_y = jnp.abs(y_local)
+        forward_mask = x_local >= abs_y
+        rear_mask = -x_local >= abs_y
+        side_mask = ~(forward_mask | rear_mask)
+
+        front_limit = self.max_distance
+        side_limit = self.max_distance * 0.625
+        rear_limit = self.max_distance * 0.3125
+
+        region_limit = jnp.where(
+            forward_mask,
+            front_limit,
+            jnp.where(side_mask, side_limit, rear_limit),
+        )
+        return xy_dist <= (region_limit + bound_radii)
 
     @partial(jax.jit, static_argnums=(0,))
     def render(
@@ -152,6 +172,7 @@ class MjLidarJax:
         geom_xpos: jax.Array,
         geom_xmat: jax.Array,
         rays_origin: jax.Array,
+        sensor_mat: jax.Array,
         rays_direction: jax.Array,
     ) -> jax.Array:
         """
@@ -179,6 +200,7 @@ class MjLidarJax:
             rad = self.geom_sizes[self.sphere_ids, 0]
             active = self._candidate_mask(
                 rays_origin,
+                sensor_mat,
                 pos,
                 self.sphere_bound_radii[self.sphere_ids],
             )
@@ -211,6 +233,7 @@ class MjLidarJax:
             size = self.geom_sizes[self.box_ids]
             active = self._candidate_mask(
                 rays_origin,
+                sensor_mat,
                 pos,
                 self.box_bound_radii[self.box_ids],
             )
@@ -241,6 +264,7 @@ class MjLidarJax:
             size = self.geom_sizes[self.capsule_ids]
             active = self._candidate_mask(
                 rays_origin,
+                sensor_mat,
                 pos,
                 self.capsule_bound_radii[self.capsule_ids],
             )
@@ -273,6 +297,7 @@ class MjLidarJax:
             size = self.geom_sizes[self.cylinder_ids]
             active = self._candidate_mask(
                 rays_origin,
+                sensor_mat,
                 pos,
                 self.cylinder_bound_radii[self.cylinder_ids],
             )
@@ -325,6 +350,7 @@ class MjLidarJax:
             size = self.geom_sizes[self.ellipsoid_ids]
             active = self._candidate_mask(
                 rays_origin,
+                sensor_mat,
                 pos,
                 self.ellipsoid_bound_radii[self.ellipsoid_ids],
             )
@@ -405,7 +431,7 @@ class MjLidarJax:
         world_rays = local_rays @ sensor_mat.T
 
         # 3. Render
-        distances = self.render(geom_xpos, geom_xmat, sensor_pos, world_rays)
+        distances = self.render(geom_xpos, geom_xmat, sensor_pos, sensor_mat, world_rays)
 
         return distances, local_rays
 
@@ -415,6 +441,7 @@ class MjLidarJax:
         geom_xpos: jax.Array,
         geom_xmat: jax.Array,
         rays_origin: jax.Array,
+        sensor_mat: jax.Array,
         rays_direction: jax.Array,
     ) -> jax.Array:
         """
@@ -433,7 +460,7 @@ class MjLidarJax:
         if geom_xmat.ndim == 3 and geom_xmat.shape[-1] == 9:
             geom_xmat = geom_xmat.reshape(geom_xmat.shape[0], -1, 3, 3)
 
-        return jax.vmap(self.render)(geom_xpos, geom_xmat, rays_origin, rays_direction)
+        return jax.vmap(self.render)(geom_xpos, geom_xmat, rays_origin, sensor_mat, rays_direction)
 
     @partial(jax.jit, static_argnums=(0,))
     def trace_rays_batch(
@@ -471,7 +498,7 @@ class MjLidarJax:
             world_rays = local_rays @ sensor_mat.T
 
             # 3. Render
-            distances = self.render(geom_xpos, geom_xmat, sensor_pos, world_rays)
+            distances = self.render(geom_xpos, geom_xmat, sensor_pos, sensor_mat, world_rays)
 
             return distances
 
